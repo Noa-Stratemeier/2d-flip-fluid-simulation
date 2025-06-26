@@ -1,3 +1,5 @@
 - Rewrite createParticles() function, currently points can be placed intersecting the 
 top of the screen if NUMBER_OF_PARTICLES is set too large. Also should just write the
 function better.
+
+- Check animate() function.

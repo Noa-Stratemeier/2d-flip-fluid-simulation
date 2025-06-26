@@ -1,12 +1,12 @@
-// Simulation parameters
-const NUMBER_OF_PARTICLES = 1000;
-const PARTICLE_RADIUS = 10.0;
-
+// SIMULATION PARAMETERS
+const NUMBER_OF_PARTICLES = 500;
+const PARTICLE_DIAMETER = 10.0; 
+const PARTICLE_RADIUS = PARTICLE_DIAMETER / 2.0;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 
-
 let particles = [];
+
 
 class Particle {
     constructor(x, y, vx, vy, color) {
@@ -19,12 +19,66 @@ class Particle {
 }
 
 /**
+ * Detects and resolves collisions between particles and walls in
+ * the simulation by clamping positions to stay within bounds and 
+ * zeroing velocity along the collision axis.
+ */
+function handleWallCollisions() {
+    for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
+        let p = particles[i];
+
+        // Collision with left wall
+        if (p.x - PARTICLE_RADIUS < 0) {
+            p.x = PARTICLE_RADIUS;
+            p.vx = 0;
+        }
+
+        // Collision with right wall
+        if (p.x + PARTICLE_RADIUS > CANVAS_WIDTH) {
+            p.x = CANVAS_WIDTH - PARTICLE_RADIUS;
+            p.vx = 0;
+        }
+
+        // Collision with bottom wall
+        if (p.y - PARTICLE_RADIUS < 0) {
+            p.y = PARTICLE_RADIUS;
+            p.vy = 0;
+        }
+
+        // Collision with top wall
+        if (p.y + PARTICLE_RADIUS > CANVAS_HEIGHT) {
+            p.y = CANVAS_HEIGHT - PARTICLE_RADIUS; 
+            p.vy = 0;
+        }
+    }
+}
+
+/**
+ * Updates particle positions and velocities using Euler integration.
+ *
+ * @param {number} dt - Time step for integration.
+ * @param {number} gravity - Vertical acceleration due to gravity.
+ */
+function integrateParticles(dt, gravity) {
+    for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
+        let p = particles[i];
+
+        // Update particle velocity based on gravity
+        p.vy += gravity * dt;
+
+        // Update particle position based on velocity
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+    }
+}
+
+/**
  * Initialises the particle array by placing particles in a non-overlapping grid
  * on the lower-left half of the canvas. Each particle is initialised with zero 
  * velocity and a solid blue color.
  */
 function createParticles() {
-    const spacing = PARTICLE_RADIUS * 1.1;
+    const spacing = PARTICLE_DIAMETER * 1.1;
     const particlesPerRow = Math.floor(0.5 * CANVAS_WIDTH / spacing);
     const rows = Math.ceil(NUMBER_OF_PARTICLES / particlesPerRow);
 
@@ -49,8 +103,8 @@ function createParticles() {
  * @returns {Float32Array} Flat buffer of particle data.
  */
 function particlesToBuffer() {
-    let bufferData = new Float32Array(particles.length * 6);
-    for (let i = 0; i < particles.length; i++) {
+    let bufferData = new Float32Array(NUMBER_OF_PARTICLES * 6);
+    for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
         let p = particles[i];
         let pPositionNDC = simulationCoordinatesToNDC(p.x, p.y);
 
@@ -143,7 +197,7 @@ createParticles();
 const particlesBufferData = particlesToBuffer();
 
 const uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
-gl.uniform1f(uPointSizeLocation, PARTICLE_RADIUS);
+gl.uniform1f(uPointSizeLocation, PARTICLE_DIAMETER);
 
 const aPositionLocation = gl.getAttribLocation(program, 'aPosition');
 const aColorLocation = gl.getAttribLocation(program, 'aColor');
@@ -161,4 +215,29 @@ gl.bufferData(gl.ARRAY_BUFFER, particlesBufferData, gl.STATIC_DRAW);
 gl.vertexAttribPointer(aPositionLocation, 2, gl.FLOAT, false, 6 * 4, 0);
 gl.vertexAttribPointer(aColorLocation, 4, gl.FLOAT, false, 6 * 4, 2 * 4);
 
-gl.drawArrays(gl.POINTS, 0, particles.length);
+gl.drawArrays(gl.POINTS, 0, NUMBER_OF_PARTICLES);
+
+
+
+
+
+
+
+
+// dt = 1 / 60;
+// function animate() {
+//     integrateParticles(dt, -9.81);
+//     handleWallCollisions();
+
+//     const bufferData = particlesToBuffer();
+//     gl.bindBuffer(gl.ARRAY_BUFFER, particlesBuffer);
+//     gl.bufferData(gl.ARRAY_BUFFER, bufferData, gl.STATIC_DRAW);
+
+//     gl.clear(gl.COLOR_BUFFER_BIT);
+//     gl.drawArrays(gl.POINTS, 0, particles.length);
+
+//     requestAnimationFrame(animate);
+// }
+// requestAnimationFrame(animate);
+
+
