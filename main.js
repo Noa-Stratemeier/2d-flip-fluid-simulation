@@ -1,9 +1,26 @@
-// SIMULATION PARAMETERS
+// SIMULATION PARAMETERS.
 const NUMBER_OF_PARTICLES = 500;
-const PARTICLE_DIAMETER = 10.0; 
-const PARTICLE_RADIUS = PARTICLE_DIAMETER / 2.0;
-const CANVAS_WIDTH = 800;
-const CANVAS_HEIGHT = 600;
+const PARTICLE_RADIUS = 5;
+
+const CELL_SPACING = 10;
+const HALF_CELL_SPACING = CELL_SPACING / 2;
+const INVERSE_CELL_SPACING = 1 / CELL_SPACING;
+const X_CELLS = 80;
+const Y_CELLS = 60;
+const TOTAL_CELLS = X_CELLS * Y_CELLS;
+
+const CANVAS_WIDTH = X_CELLS * CELL_SPACING;
+const CANVAS_HEIGHT = Y_CELLS * CELL_SPACING;
+
+// Vertices for the velocity grids (note, these grids are the same size as the simulation grid, they are simply shifted)
+const X_VERTICES = X_CELLS + 1;
+const Y_VERTICES = Y_CELLS + 1;
+const TOTAL_VERTICES = X_VERTICES * Y_VERTICES
+let horizontalGridVelocities = new Float32Array(TOTAL_VERTICES);  // Note, these store the cell vertices of these grids, not the cells themselves
+let verticalGridVelocities = new Float32Array(TOTAL_VERTICES);
+let horizontalGridWeights = new Float32Array(TOTAL_VERTICES);  
+let verticalGridWeights = new Float32Array(TOTAL_VERTICES);
+
 
 let particles = [];
 
@@ -18,37 +35,103 @@ class Particle {
     }
 }
 
+
+function transferVelocitiesToGrid(component) {
+    let dx = component === 'x' ? 0 : HALF_CELL_SPACING;
+    let dy = component === 'x' ? HALF_CELL_SPACING : 0;
+
+    let grid = component === 'x' ? horizontalGridVelocities : verticalGridVelocities;
+    let gridWeights = component === 'x' ? horizontalGridWeights : verticalGridWeights;
+
+    for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
+        let particle = particles[i];
+
+        // Particle's position in the current grid's coordinate system.
+        let x = particle.x + dx;
+        let y = particle.y + dy;
+
+        // Find the grid cell indices for the cell containing the current particle.
+        let gridX = Math.floor(x * INVERSE_CELL_SPACING);
+        let gridY = Math.floor(y * INVERSE_CELL_SPACING);
+
+        // Remainders of the particle's position in the grid cell.
+        let deltaX = x - gridX * CELL_SPACING;
+        let deltaY = y - gridY * CELL_SPACING;
+
+        // Bilinear interpolation weights for the four corners of the grid cell.
+        let w1 = (1 - deltaX * INVERSE_CELL_SPACING) * (1 - deltaY * INVERSE_CELL_SPACING);
+        let w2 = deltaX * INVERSE_CELL_SPACING * (1 - deltaY * INVERSE_CELL_SPACING);
+        let w3 = (deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
+        let w4 = (1 - deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
+
+        // Calculate the array indices of the four corners of the grid cell.
+        let bottomLeft = gridX + gridY * X_VERTICES;
+        let bottomRight = (gridX + 1) + gridY * X_VERTICES;
+        let topLeft = gridX + (gridY + 1) * X_VERTICES;
+        let topRight = (gridX + 1) + (gridY + 1) * X_VERTICES;
+
+        let particleVelocity = component === 'x' ? particle.vx : particle.vy;
+
+        // Update the sum of weighted grid velocities at the four corners of the grid cell.
+        grid[bottomLeft] += w1 * particleVelocity;
+        grid[bottomRight] += w2 * particleVelocity;
+        grid[topRight] += w3 * particleVelocity;
+        grid[topLeft] += w4 * particleVelocity;
+
+        // Update the sum of grid weights at the four corners of the grid cell.
+        gridWeights[bottomLeft] += w1;
+        gridWeights[bottomRight] += w2;
+        gridWeights[topRight] += w3;
+        gridWeights[topLeft] += w4;
+    }
+
+    for (let i = 0; i < TOTAL_VERTICES; i++) {
+        if (gridWeights[i] > 0) {
+            // Normalise the sum of weighted grid velocities by the sum of weights at each grid cell.
+            grid[i] /= gridWeights[i];
+        }
+    }
+}
+
+
 /**
- * Detects and resolves collisions between particles and walls in
- * the simulation by clamping positions to stay within bounds and 
- * zeroing velocity along the collision axis.
+ * Detects and resolves collisions between particles and walls in the simulation 
+ * by clamping positions to stay within bounds and zeroing velocity along the 
+ * collision axis. Note that the outermost layer of grid cells in the simulation
+ * are the walls considered here.
  */
 function handleWallCollisions() {
     for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
-        let p = particles[i];
+        let particle = particles[i];
 
-        // Collision with left wall
-        if (p.x - PARTICLE_RADIUS < 0) {
-            p.x = PARTICLE_RADIUS;
-            p.vx = 0;
+        // Define the simulation bounds.
+        let minX = PARTICLE_RADIUS + CELL_SPACING;
+        let maxX = CANVAS_WIDTH - PARTICLE_RADIUS - CELL_SPACING;
+        let minY = PARTICLE_RADIUS + CELL_SPACING;
+        let maxY = CANVAS_HEIGHT - PARTICLE_RADIUS - CELL_SPACING;
+
+        // Collision with left wall.
+        if (particle.x < minX) {
+            particle.x = minX
+            particle.vx = 0;
         }
 
-        // Collision with right wall
-        if (p.x + PARTICLE_RADIUS > CANVAS_WIDTH) {
-            p.x = CANVAS_WIDTH - PARTICLE_RADIUS;
-            p.vx = 0;
+        // Collision with right wall.
+        if (particle.x > maxX) {
+            particle.x = maxX;
+            particle.vx = 0;
         }
 
-        // Collision with bottom wall
-        if (p.y - PARTICLE_RADIUS < 0) {
-            p.y = PARTICLE_RADIUS;
-            p.vy = 0;
+        // Collision with bottom wall.
+        if (particle.y < minY) {
+            particle.y = minY;
+            particle.vy = 0;
         }
 
         // Collision with top wall
-        if (p.y + PARTICLE_RADIUS > CANVAS_HEIGHT) {
-            p.y = CANVAS_HEIGHT - PARTICLE_RADIUS; 
-            p.vy = 0;
+        if (particle.y > maxY) {
+            particle.y = maxY; 
+            particle.vy = 0;
         }
     }
 }
@@ -57,18 +140,18 @@ function handleWallCollisions() {
  * Updates particle positions and velocities using Euler integration.
  *
  * @param {number} dt - Time step for integration.
- * @param {number} gravity - Vertical acceleration due to gravity.
+ * @param {number} gravity - Vertical acceleration due to gravity (negative = down).
  */
 function integrateParticles(dt, gravity) {
     for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
-        let p = particles[i];
+        let particle = particles[i];
 
-        // Update particle velocity based on gravity
-        p.vy += gravity * dt;
+        // Apply gravity.
+        particle.vy += gravity * dt;
 
-        // Update particle position based on velocity
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
+        // Update particle position based on velocity.
+        particle.x += particle.vx * dt;
+        particle.y += particle.vy * dt;
     }
 }
 
@@ -78,7 +161,7 @@ function integrateParticles(dt, gravity) {
  * velocity and a solid blue color.
  */
 function createParticles() {
-    const spacing = PARTICLE_DIAMETER * 1.1;
+    const spacing = 2 * PARTICLE_RADIUS * 1.1;
     const particlesPerRow = Math.floor(0.5 * CANVAS_WIDTH / spacing);
     const rows = Math.ceil(NUMBER_OF_PARTICLES / particlesPerRow);
 
@@ -197,7 +280,7 @@ createParticles();
 const particlesBufferData = particlesToBuffer();
 
 const uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
-gl.uniform1f(uPointSizeLocation, PARTICLE_DIAMETER);
+gl.uniform1f(uPointSizeLocation, 2 * PARTICLE_RADIUS);
 
 const aPositionLocation = gl.getAttribLocation(program, 'aPosition');
 const aColorLocation = gl.getAttribLocation(program, 'aColor');
@@ -224,7 +307,7 @@ gl.drawArrays(gl.POINTS, 0, NUMBER_OF_PARTICLES);
 
 
 
-// dt = 1 / 60;
+// const dt = 1 / 60;
 // function animate() {
 //     integrateParticles(dt, -9.81);
 //     handleWallCollisions();
