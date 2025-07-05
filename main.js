@@ -1,25 +1,32 @@
 // SIMULATION PARAMETERS.
-const NUMBER_OF_PARTICLES = 500;
+const NUMBER_OF_PARTICLES = 100;
 const PARTICLE_RADIUS = 5;
 
 const CELL_SPACING = 10;
 const HALF_CELL_SPACING = CELL_SPACING / 2;
 const INVERSE_CELL_SPACING = 1 / CELL_SPACING;
-const X_CELLS = 80;
-const Y_CELLS = 60;
+const X_CELLS = 40;
+const Y_CELLS = 30;
 const TOTAL_CELLS = X_CELLS * Y_CELLS;
 
 const CANVAS_WIDTH = X_CELLS * CELL_SPACING;
 const CANVAS_HEIGHT = Y_CELLS * CELL_SPACING;
 
-// Vertices for the velocity grids (note, these grids are the same size as the simulation grid, they are simply shifted)
-const X_VERTICES = X_CELLS + 1;
-const Y_VERTICES = Y_CELLS + 1;
-const TOTAL_VERTICES = X_VERTICES * Y_VERTICES
-let horizontalGridVelocities = new Float32Array(TOTAL_VERTICES);  // Note, these store the cell vertices of these grids, not the cells themselves
+// Vertices for the velocity grids (note, these grids are one cell smaller than the simulation grid in x and y, they are shifted by half a cell spacing).
+// The vertical velocity grid is shifted to the right, and the horizontal velocity grid is shifted up.
+X_VERTICES = X_CELLS;
+Y_VERTICES = Y_CELLS;
+TOTAL_VERTICES = TOTAL_CELLS;
+let horizontalGridVelocities = new Float32Array(TOTAL_VERTICES);  // Note, these store the cell vertices of these grids, not the cells
 let verticalGridVelocities = new Float32Array(TOTAL_VERTICES);
 let horizontalGridWeights = new Float32Array(TOTAL_VERTICES);  
 let verticalGridWeights = new Float32Array(TOTAL_VERTICES);
+
+const SOLID_CELL = 1;
+const FLUID_CELL = 2;
+const EMPTY_CELL = 3;
+let cellType = new Float32Array(TOTAL_CELLS); 
+let solidCells = new Float32Array(TOTAL_CELLS);  // 1 = solid, 0 = not
 
 
 let particles = [];
@@ -36,59 +43,88 @@ class Particle {
 }
 
 
-function transferVelocitiesToGrid(component) {
-    let dx = component === 'x' ? 0 : HALF_CELL_SPACING;
-    let dy = component === 'x' ? HALF_CELL_SPACING : 0;
+function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
 
-    let grid = component === 'x' ? horizontalGridVelocities : verticalGridVelocities;
-    let gridWeights = component === 'x' ? horizontalGridWeights : verticalGridWeights;
+    for (let iteration = 0; iteration < numberOfIterations; iteration++) {
 
-    for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
-        let particle = particles[i];
+        // Loop over simulation grid, ignoring the outermost layer of cells (as these are walls).
+        for (let gridX = 1; gridX < X_CELLS - 1; gridX++) {
+            for (let gridY = 1; gridY < Y_CELLS - 1; gridX++) {
+                
 
-        // Particle's position in the current grid's coordinate system.
-        let x = particle.x + dx;
-        let y = particle.y + dy;
 
-        // Find the grid cell indices for the cell containing the current particle.
-        let gridX = Math.floor(x * INVERSE_CELL_SPACING);
-        let gridY = Math.floor(y * INVERSE_CELL_SPACING);
+            }
 
-        // Remainders of the particle's position in the grid cell.
-        let deltaX = x - gridX * CELL_SPACING;
-        let deltaY = y - gridY * CELL_SPACING;
+        }
 
-        // Bilinear interpolation weights for the four corners of the grid cell.
-        let w1 = (1 - deltaX * INVERSE_CELL_SPACING) * (1 - deltaY * INVERSE_CELL_SPACING);
-        let w2 = deltaX * INVERSE_CELL_SPACING * (1 - deltaY * INVERSE_CELL_SPACING);
-        let w3 = (deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
-        let w4 = (1 - deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
 
-        // Calculate the array indices of the four corners of the grid cell.
-        let bottomLeft = gridX + gridY * X_VERTICES;
-        let bottomRight = (gridX + 1) + gridY * X_VERTICES;
-        let topLeft = gridX + (gridY + 1) * X_VERTICES;
-        let topRight = (gridX + 1) + (gridY + 1) * X_VERTICES;
-
-        let particleVelocity = component === 'x' ? particle.vx : particle.vy;
-
-        // Update the sum of weighted grid velocities at the four corners of the grid cell.
-        grid[bottomLeft] += w1 * particleVelocity;
-        grid[bottomRight] += w2 * particleVelocity;
-        grid[topRight] += w3 * particleVelocity;
-        grid[topLeft] += w4 * particleVelocity;
-
-        // Update the sum of grid weights at the four corners of the grid cell.
-        gridWeights[bottomLeft] += w1;
-        gridWeights[bottomRight] += w2;
-        gridWeights[topRight] += w3;
-        gridWeights[topLeft] += w4;
     }
 
-    for (let i = 0; i < TOTAL_VERTICES; i++) {
-        if (gridWeights[i] > 0) {
-            // Normalise the sum of weighted grid velocities by the sum of weights at each grid cell.
-            grid[i] /= gridWeights[i];
+}
+
+function transferVelocitiesToGrid() {
+    // Reset velocities and weights
+    horizontalGridVelocities.fill(0, 0);
+    verticalGridVelocities.fill(0, 0);
+    horizontalGridWeights.fill(0, 0);
+    verticalGridWeights.fill(0, 0);
+
+    let components = ['x', 'y'];
+
+    for (let component of components) {
+        let dx = component === 'x' ? 0 : HALF_CELL_SPACING;
+        let dy = component === 'x' ? HALF_CELL_SPACING : 0;
+
+        let grid = component === 'x' ? horizontalGridVelocities : verticalGridVelocities;
+        let gridWeights = component === 'x' ? horizontalGridWeights : verticalGridWeights;
+
+        for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
+            let particle = particles[i];
+
+            // Particle's position in the current velocity grid's coordinate system.
+            let x = particle.x - dx;
+            let y = particle.y - dy;
+
+            // Find the grid cell indices for the cell containing the current particle.
+            let gridX = Math.floor(x * INVERSE_CELL_SPACING);
+            let gridY = Math.floor(y * INVERSE_CELL_SPACING);
+
+            // Remainders of the particle's position in the grid cell.
+            let deltaX = x - gridX * CELL_SPACING;
+            let deltaY = y - gridY * CELL_SPACING;
+
+            // Bilinear interpolation weights for the four corners of the grid cell.
+            let w1 = (1 - deltaX * INVERSE_CELL_SPACING) * (1 - deltaY * INVERSE_CELL_SPACING);
+            let w2 = deltaX * INVERSE_CELL_SPACING * (1 - deltaY * INVERSE_CELL_SPACING);
+            let w3 = (deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
+            let w4 = (1 - deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
+
+            // Calculate the array indices of the four corners of the grid cell.
+            let bottomLeft = gridX + gridY * X_VERTICES;
+            let bottomRight = (gridX + 1) + gridY * X_VERTICES;
+            let topLeft = gridX + (gridY + 1) * X_VERTICES;
+            let topRight = (gridX + 1) + (gridY + 1) * X_VERTICES;
+
+            let particleVelocity = component === 'x' ? particle.vx : particle.vy;
+
+            // Update the sum of weighted grid velocities at the four corners of the grid cell.
+            grid[bottomLeft] += w1 * particleVelocity;
+            grid[bottomRight] += w2 * particleVelocity;
+            grid[topRight] += w3 * particleVelocity;
+            grid[topLeft] += w4 * particleVelocity;
+
+            // Update the sum of grid weights at the four corners of the grid cell.
+            gridWeights[bottomLeft] += w1;
+            gridWeights[bottomRight] += w2;
+            gridWeights[topRight] += w3;
+            gridWeights[topLeft] += w4;
+        }
+
+        for (let i = 0; i < TOTAL_VERTICES; i++) {
+            if (gridWeights[i] > 0) {
+                // Normalise the sum of weighted grid velocities by the sum of weights at each grid cell.
+                grid[i] /= gridWeights[i];
+            }
         }
     }
 }
@@ -169,8 +205,8 @@ function createParticles() {
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < particlesPerRow; col++) {
             if (count >= NUMBER_OF_PARTICLES) break;
-            const x = col * spacing + PARTICLE_RADIUS;
-            const y = row * spacing + PARTICLE_RADIUS;
+            const x = col * spacing + PARTICLE_RADIUS + CELL_SPACING;
+            const y = row * spacing + PARTICLE_RADIUS + CELL_SPACING;
             const vx = 0.0;
             const vy = 0.0;
             const color = [0.0, 0.0, 1.0, 1.0];
@@ -276,7 +312,7 @@ gl.linkProgram(program);
 
 gl.useProgram(program);
 
-createParticles();
+createParticles();  // Create particles
 const particlesBufferData = particlesToBuffer();
 
 const uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
