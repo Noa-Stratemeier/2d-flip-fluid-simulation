@@ -22,11 +22,11 @@ let verticalGridVelocities = new Float32Array(TOTAL_VERTICES);
 let horizontalGridWeights = new Float32Array(TOTAL_VERTICES);  
 let verticalGridWeights = new Float32Array(TOTAL_VERTICES);
 
-const SOLID_CELL = 1;
-const FLUID_CELL = 2;
-const EMPTY_CELL = 3;
+const SOLID_CELL = 0;
+const FLUID_CELL = 1;
+const EMPTY_CELL = 2;
 let cellType = new Float32Array(TOTAL_CELLS); 
-let solidCells = new Float32Array(TOTAL_CELLS);  // 1 = solid, 0 = not
+let solidCells = new Float32Array(TOTAL_CELLS);  // 0 = solid, 1 = not
 
 
 let particles = [];
@@ -50,20 +50,46 @@ function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
         // Loop over simulation grid, ignoring the outermost layer of cells (as these are walls).
         for (let gridX = 1; gridX < X_CELLS - 1; gridX++) {
             for (let gridY = 1; gridY < Y_CELLS - 1; gridX++) {
+
+                // Skip non-fluid cells.
+                if (cellType[gridX + gridY * X_CELLS] != FLUID_CELL) {
+                    continue;
+                }
+
+                // Get the array index of the current fluid cell.
+                let centre = gridX + gridY * X_CELLS
+
+                // Get the array indices of the surrounding cells.
+                let left = centre - 1;
+                let right = centre + 1;
+                let bottom = centre - X_CELLS;
+                let top = centre + X_CELLS;
+
+                // Check the solid status of the surrounding cells (0 = solid).
+                let leftSolid = solidCells[left];
+                let rightSolid = solidCells[right];
+                let bottomSolid = solidCells[bottom];
+                let topSolid = solidCells[top];
+
+                let surroundingSolid = leftSolid + rightSolid + bottomSolid + topSolid;
+
+                // Calculate the divergence of the current fluid cell.
+                let divergence = horizontalGridVelocities[right] - horizontalGridVelocities[centre] + verticalGridVelocities[top] - verticalGridVelocities[centre];
                 
+                let divergenceCorrection = divergence / surroundingSolid;
+                let relaxedDivergence = overRelaxation * divergenceCorrection;
 
-
+                horizontalGridVelocities[centre] = horizontalGridVelocities[centre] + leftSolid * relaxedDivergence;
+                horizontalGridVelocities[right] = horizontalGridVelocities[right] - rightSolid * relaxedDivergence;
+                verticalGridVelocities[centre] = verticalGridVelocities[centre] + bottomSolid * relaxedDivergence;
+                verticalGridVelocities[top] = verticalGridVelocities[top] - topSolid * relaxedDivergence;
             }
-
         }
-
-
     }
-
 }
 
 function transferVelocitiesToGrid() {
-    // Reset velocities and weights
+    // Reset velocities and weights.
     horizontalGridVelocities.fill(0, 0);
     verticalGridVelocities.fill(0, 0);
     horizontalGridWeights.fill(0, 0);
@@ -85,7 +111,7 @@ function transferVelocitiesToGrid() {
             let x = particle.x - dx;
             let y = particle.y - dy;
 
-            // Find the grid cell indices for the cell containing the current particle.
+            // Find the grid cell axis indices for the cell containing the current particle.
             let gridX = Math.floor(x * INVERSE_CELL_SPACING);
             let gridY = Math.floor(y * INVERSE_CELL_SPACING);
 
@@ -239,7 +265,7 @@ function particlesToBuffer() {
 
 /**
  * Converts simulation coordinates (origin bottom-left) to Normalised Device Coordinates 
- * (NDC), where the origin is the center of the screen and axes range from -1 to 1. WebGL 
+ * (NDC), where the origin is the centre of the screen and axes range from -1 to 1. WebGL 
  * expects coordinates in NDC space, so this conversion is necessary for rendering.
  *
  * @param {number} x - X position in simulation space.
