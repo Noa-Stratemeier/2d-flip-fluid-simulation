@@ -1,6 +1,6 @@
 // SIMULATION PARAMETERS.
-const NUMBER_OF_PARTICLES = 100;
-const PARTICLE_RADIUS = 5;
+const NUMBER_OF_PARTICLES = 1000;
+const PARTICLE_RADIUS = 3;
 
 const CELL_SPACING = 10;
 const HALF_CELL_SPACING = CELL_SPACING / 2;
@@ -14,9 +14,9 @@ const CANVAS_HEIGHT = Y_CELLS * CELL_SPACING;
 
 // Vertices for the velocity grids (note, these grids are one cell smaller than the simulation grid in x and y, they are shifted by half a cell spacing).
 // The vertical velocity grid is shifted to the right, and the horizontal velocity grid is shifted up.
-X_VERTICES = X_CELLS;
-Y_VERTICES = Y_CELLS;
-TOTAL_VERTICES = TOTAL_CELLS;
+const X_VERTICES = X_CELLS;
+const Y_VERTICES = Y_CELLS;
+const TOTAL_VERTICES = TOTAL_CELLS;
 let horizontalGridVelocities = new Float32Array(TOTAL_VERTICES);  // Note, these store the cell vertices of these grids, not the cells
 let verticalGridVelocities = new Float32Array(TOTAL_VERTICES);
 let horizontalGridWeights = new Float32Array(TOTAL_VERTICES);  
@@ -42,6 +42,15 @@ class Particle {
     }
 }
 
+function setupSolidCells() {
+    for (let gridX = 0; gridX < X_CELLS; gridX++) {
+        for (let gridY = 0; gridY < Y_CELLS; gridY++) {
+            if (gridX === 0 || gridY === 0 || gridX === X_CELLS - 1 || gridY === Y_CELLS - 1) {
+                solidCells[gridX + gridY * X_CELLS] = 1;
+            }
+        }
+    }
+}
 
 function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
 
@@ -49,10 +58,10 @@ function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
 
         // Loop over simulation grid, ignoring the outermost layer of cells (as these are walls).
         for (let gridX = 1; gridX < X_CELLS - 1; gridX++) {
-            for (let gridY = 1; gridY < Y_CELLS - 1; gridX++) {
+            for (let gridY = 1; gridY < Y_CELLS - 1; gridY++) {
 
                 // Skip non-fluid cells.
-                if (cellType[gridX + gridY * X_CELLS] != FLUID_CELL) {
+                if (cellType[gridX + gridY * X_CELLS] !== FLUID_CELL) {
                     continue;
                 }
 
@@ -79,10 +88,11 @@ function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
                 let divergenceCorrection = divergence / surroundingSolid;
                 let relaxedDivergence = overRelaxation * divergenceCorrection;
 
-                horizontalGridVelocities[centre] = horizontalGridVelocities[centre] + leftSolid * relaxedDivergence;
-                horizontalGridVelocities[right] = horizontalGridVelocities[right] - rightSolid * relaxedDivergence;
-                verticalGridVelocities[centre] = verticalGridVelocities[centre] + bottomSolid * relaxedDivergence;
-                verticalGridVelocities[top] = verticalGridVelocities[top] - topSolid * relaxedDivergence;
+                // Update grid velocities to zero the current cells divergence.
+                horizontalGridVelocities[centre] += leftSolid * relaxedDivergence;
+                horizontalGridVelocities[right] -= rightSolid * relaxedDivergence;
+                verticalGridVelocities[centre] += bottomSolid * relaxedDivergence;
+                verticalGridVelocities[top] -= topSolid * relaxedDivergence;
             }
         }
     }
@@ -352,7 +362,7 @@ gl.enableVertexAttribArray(aColorLocation);
 
 const particlesBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, particlesBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, particlesBufferData, gl.STATIC_DRAW);
+gl.bufferData(gl.ARRAY_BUFFER, particlesBufferData, gl.DYNAMIC_DRAW);
 
 // Each particle has 6 components. The first two are the particle's position (x, y),
 // the next four are the particle's RGBA color (r, g, b, a). Each component is a 32 
@@ -366,18 +376,21 @@ gl.drawArrays(gl.POINTS, 0, NUMBER_OF_PARTICLES);
 
 
 
-
-
-
-// const dt = 1 / 60;
+// const dt = 1 / 120;
+// const numberOfDivergenceIterations = 100;
+// const overRelaxation = 1.9;
 // function animate() {
 //     integrateParticles(dt, -9.81);
 //     handleWallCollisions();
+//     transferVelocitiesToGrid();
+//     solveIncompressibility(numberOfDivergenceIterations, dt, overRelaxation);
+//     transferVelocitiesToParticles(); // Complete this function
 
 //     const bufferData = particlesToBuffer();
 //     gl.bindBuffer(gl.ARRAY_BUFFER, particlesBuffer);
-//     gl.bufferData(gl.ARRAY_BUFFER, bufferData, gl.STATIC_DRAW);
+//     gl.bufferData(gl.ARRAY_BUFFER, bufferData, gl.DYNAMIC_DRAW);
 
+//     gl.clearColor(0, 0, 0, 1);  // Black background
 //     gl.clear(gl.COLOR_BUFFER_BIT);
 //     gl.drawArrays(gl.POINTS, 0, particles.length);
 
