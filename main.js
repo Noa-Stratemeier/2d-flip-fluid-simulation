@@ -42,11 +42,29 @@ class Particle {
     }
 }
 
+function markCellTypes() {
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        cellType[i] = solidCells[i] === 0 ? SOLID_CELL : EMPTY_CELL;
+    }
+
+    for (let particle of particles) {
+        let gridX = Math.floor(particle.x * INVERSE_CELL_SPACING);
+        let gridY = Math.floor(particle.y * INVERSE_CELL_SPACING);
+
+        let gridIndex = gridX + gridY * X_CELLS;
+        if (cellType[gridIndex] === EMPTY_CELL) {
+            cellType[gridIndex] = FLUID_CELL;
+        }
+    }
+}
+
 function setupSolidCells() {
+    solidCells.fill(1, 0);
+
     for (let gridX = 0; gridX < X_CELLS; gridX++) {
         for (let gridY = 0; gridY < Y_CELLS; gridY++) {
             if (gridX === 0 || gridY === 0 || gridX === X_CELLS - 1 || gridY === Y_CELLS - 1) {
-                solidCells[gridX + gridY * X_CELLS] = 1;
+                solidCells[gridX + gridY * X_CELLS] = 0;
             }
         }
     }
