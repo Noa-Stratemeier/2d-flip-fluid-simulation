@@ -1,5 +1,19 @@
+FIX:
 - Rewrite createParticles() function, currently points can be placed intersecting the 
 top of the screen if NUMBER_OF_PARTICLES is set too large. Also should just write the
 function better.
 
 - Check animate() function.
+
+- Change particle = particle[i] to for..of loops.
+
+- Refactor the code, current state is embarrassing.
+
+
+
+COMPLETE:
+- Add FLIP.
+
+- Add a pressure grid (reduce divergence in dense regions and vice versa).
+
+- Separate particles using spatial hashing.

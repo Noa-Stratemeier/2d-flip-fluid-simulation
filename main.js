@@ -1,12 +1,17 @@
 // SIMULATION PARAMETERS.
-const NUMBER_OF_PARTICLES = 1000;
+const GRAVITY = -200;
+const dt = 1.0 / 120.0;
+const numberOfDivergenceIterations = 50;
+const overRelaxation = 1.9;
+
+const NUMBER_OF_PARTICLES = 14000;
 const PARTICLE_RADIUS = 3;
 
-const CELL_SPACING = 10;
+const CELL_SPACING = 8;
 const HALF_CELL_SPACING = CELL_SPACING / 2;
 const INVERSE_CELL_SPACING = 1 / CELL_SPACING;
-const X_CELLS = 40;
-const Y_CELLS = 30;
+const X_CELLS = 200;
+const Y_CELLS = 100;
 const TOTAL_CELLS = X_CELLS * Y_CELLS;
 
 const CANVAS_WIDTH = X_CELLS * CELL_SPACING;
@@ -116,12 +121,74 @@ function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
     }
 }
 
+function transferVelocitiesToParticles() {
+    let components = ['x', 'y'];
+
+    for (let component of components) {
+        let dx = component === 'x' ? 0 : HALF_CELL_SPACING;
+        let dy = component === 'x' ? HALF_CELL_SPACING : 0;
+
+        let grid = component === 'x' ? horizontalGridVelocities : verticalGridVelocities;
+        let gridWeights = component === 'x' ? horizontalGridWeights : verticalGridWeights;
+
+        for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
+            let particle = particles[i];
+
+            // Particle's position in the current velocity grid's coordinate system.
+            let x = particle.x - dx;
+            let y = particle.y - dy;
+
+            // Find the grid cell axis indices for the cell containing the current particle.
+            let gridX = Math.floor(x * INVERSE_CELL_SPACING);
+            let gridY = Math.floor(y * INVERSE_CELL_SPACING);
+
+            // Remainders of the particle's position in the grid cell.
+            let deltaX = x - gridX * CELL_SPACING;
+            let deltaY = y - gridY * CELL_SPACING;
+
+            // Bilinear interpolation weights for the four corners of the grid cell.
+            let w1 = (1 - deltaX * INVERSE_CELL_SPACING) * (1 - deltaY * INVERSE_CELL_SPACING);
+            let w2 = deltaX * INVERSE_CELL_SPACING * (1 - deltaY * INVERSE_CELL_SPACING);
+            let w3 = (deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
+            let w4 = (1 - deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
+
+            // Calculate the array indices of the four corners of the grid cell.
+            let bottomLeft = gridX + gridY * X_VERTICES;
+            let bottomRight = (gridX + 1) + gridY * X_VERTICES;
+            let topLeft = gridX + (gridY + 1) * X_VERTICES;
+            let topRight = (gridX + 1) + (gridY + 1) * X_VERTICES;
+
+            // FINISH THIS
+            var offset = component === 'x' ? X_CELLS : 1;
+            var valid0 = cellType[bottomLeft] != EMPTY_CELL || cellType[bottomLeft - offset] != EMPTY_CELL ? 1.0 : 0.0;
+            var valid1 = cellType[bottomRight] != EMPTY_CELL || cellType[bottomRight - offset] != EMPTY_CELL ? 1.0 : 0.0;
+            var valid2 = cellType[topRight] != EMPTY_CELL || cellType[topRight - offset] != EMPTY_CELL ? 1.0 : 0.0;
+            var valid3 = cellType[topLeft] != EMPTY_CELL || cellType[topLeft - offset] != EMPTY_CELL ? 1.0 : 0.0;
+
+            var d = valid0 * w1 + valid1 * w2 + valid2 * w3 + valid3 * w4;
+
+            if (d > 0.0) {
+                var picV = (valid0 * w1 * grid[bottomLeft] + valid1 * w2 * grid[bottomRight] + valid2 * w3 * grid[topRight] + valid3 * w4 * grid[topLeft]) / d;
+
+                if (component === 'x') {
+                    particle.vx = picV;
+                } else {
+                    particle.vy = picV;
+                }
+            }
+        }
+    }
+}
+
 function transferVelocitiesToGrid() {
     // Reset velocities and weights.
     horizontalGridVelocities.fill(0, 0);
     verticalGridVelocities.fill(0, 0);
     horizontalGridWeights.fill(0, 0);
     verticalGridWeights.fill(0, 0);
+
+    // Mark cell types.
+    markCellTypes();
 
     let components = ['x', 'y'];
 
@@ -245,10 +312,35 @@ function integrateParticles(dt, gravity) {
     }
 }
 
+// /**
+//  * Initialises the particle array by placing particles in a non-overlapping grid
+//  * on the lower-left half of the canvas. Each particle is initialised with zero 
+//  * velocity and a solid blue color.
+//  */
+// function createParticles() {
+//     const spacing = 2 * PARTICLE_RADIUS * 1.1;
+//     const particlesPerRow = Math.floor(0.5 * CANVAS_WIDTH / spacing);
+//     const rows = Math.ceil(NUMBER_OF_PARTICLES / particlesPerRow);
+
+//     let count = 0;
+//     for (let row = 0; row < rows; row++) {
+//         for (let col = 0; col < particlesPerRow; col++) {
+//             if (count >= NUMBER_OF_PARTICLES) break;
+//             const x = col * spacing + PARTICLE_RADIUS + CELL_SPACING;
+//             const y = row * spacing + PARTICLE_RADIUS + CELL_SPACING;
+//             const vx = 0.0;
+//             const vy = 0.0;
+//             const color = [0.0, 0.0, 1.0, 1.0];
+//             particles.push(new Particle(x, y, vx, vy, color));
+//             count++;
+//         }
+//     }
+// }
+
 /**
- * Initialises the particle array by placing particles in a non-overlapping grid
- * on the lower-left half of the canvas. Each particle is initialised with zero 
- * velocity and a solid blue color.
+ * Initialises the particle array by placing particles in a staggered grid
+ * on the lower-left half of the canvas. Particles alternate horizontal offsets 
+ * every other row to create a more natural, less aligned distribution.
  */
 function createParticles() {
     const spacing = 2 * PARTICLE_RADIUS * 1.1;
@@ -257,9 +349,10 @@ function createParticles() {
 
     let count = 0;
     for (let row = 0; row < rows; row++) {
+        const xOffset = (row % 2 === 0) ? 0 : spacing * 0.5; // stagger every other row
         for (let col = 0; col < particlesPerRow; col++) {
             if (count >= NUMBER_OF_PARTICLES) break;
-            const x = col * spacing + PARTICLE_RADIUS + CELL_SPACING;
+            const x = col * spacing + PARTICLE_RADIUS + CELL_SPACING + xOffset;
             const y = row * spacing + PARTICLE_RADIUS + CELL_SPACING;
             const vx = 0.0;
             const vy = 0.0;
@@ -269,6 +362,7 @@ function createParticles() {
         }
     }
 }
+
 
 /**
  * Packs each particle's position (x, y) and color (r, g, b, a) into a Float32Array.
@@ -367,6 +461,7 @@ gl.linkProgram(program);
 gl.useProgram(program);
 
 createParticles();  // Create particles
+setupSolidCells();  // Setup solid cells
 const particlesBufferData = particlesToBuffer();
 
 const uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
@@ -388,32 +483,29 @@ gl.bufferData(gl.ARRAY_BUFFER, particlesBufferData, gl.DYNAMIC_DRAW);
 gl.vertexAttribPointer(aPositionLocation, 2, gl.FLOAT, false, 6 * 4, 0);
 gl.vertexAttribPointer(aColorLocation, 4, gl.FLOAT, false, 6 * 4, 2 * 4);
 
-gl.drawArrays(gl.POINTS, 0, NUMBER_OF_PARTICLES);
+//gl.drawArrays(gl.POINTS, 0, NUMBER_OF_PARTICLES);
 
 
 
 
 
-// const dt = 1 / 120;
-// const numberOfDivergenceIterations = 100;
-// const overRelaxation = 1.9;
-// function animate() {
-//     integrateParticles(dt, -9.81);
-//     handleWallCollisions();
-//     transferVelocitiesToGrid();
-//     solveIncompressibility(numberOfDivergenceIterations, dt, overRelaxation);
-//     transferVelocitiesToParticles(); // Complete this function
+function animate() {
+    integrateParticles(dt, GRAVITY);
+    handleWallCollisions();
+    transferVelocitiesToGrid();
+    solveIncompressibility(numberOfDivergenceIterations, dt, overRelaxation);
+    transferVelocitiesToParticles();
 
-//     const bufferData = particlesToBuffer();
-//     gl.bindBuffer(gl.ARRAY_BUFFER, particlesBuffer);
-//     gl.bufferData(gl.ARRAY_BUFFER, bufferData, gl.DYNAMIC_DRAW);
+    const bufferData = particlesToBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, particlesBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, bufferData, gl.DYNAMIC_DRAW);
 
-//     gl.clearColor(0, 0, 0, 1);  // Black background
-//     gl.clear(gl.COLOR_BUFFER_BIT);
-//     gl.drawArrays(gl.POINTS, 0, particles.length);
+    gl.clearColor(0, 0, 0, 1);  // Black background
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.POINTS, 0, particles.length);
 
-//     requestAnimationFrame(animate);
-// }
-// requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
 
 
