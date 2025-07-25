@@ -5,15 +5,17 @@ function better.
 
 - Check animate() function.
 
-- Change particle = particle[i] to for..of loops.
+- Fix transfer velocities to particles code.
 
 - Refactor the code, current state is embarrassing.
+
+- Fix drawing logic. Use transform feedback.
+
+- Improve FLIP Code.
 
 
 
 COMPLETE:
-- Add FLIP.
+- Separate particles using spatial hashing.
 
 - Add a pressure grid (reduce divergence in dense regions and vice versa).
-
-- Separate particles using spatial hashing.

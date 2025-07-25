@@ -1,4 +1,6 @@
 // SIMULATION PARAMETERS.
+FLIP_RATIO = 1;  // Ratio of FLIP to PIC in velocity transfer (i.e. 0.95 means 95% FLIP, 5% PIC)
+
 const GRAVITY = -200;
 const dt = 1.0 / 120.0;
 const numberOfDivergenceIterations = 50;
@@ -22,10 +24,13 @@ const CANVAS_HEIGHT = Y_CELLS * CELL_SPACING;
 const X_VERTICES = X_CELLS;
 const Y_VERTICES = Y_CELLS;
 const TOTAL_VERTICES = TOTAL_CELLS;
-let horizontalGridVelocities = new Float32Array(TOTAL_VERTICES);  // Note, these store the cell vertices of these grids, not the cells
-let verticalGridVelocities = new Float32Array(TOTAL_VERTICES);
-let horizontalGridWeights = new Float32Array(TOTAL_VERTICES);  
-let verticalGridWeights = new Float32Array(TOTAL_VERTICES);
+let uGrid = new Float32Array(TOTAL_VERTICES);  // Note, these store the cell vertices of these grids, not the cells
+let vGrid = new Float32Array(TOTAL_VERTICES);
+let uGridWeights = new Float32Array(TOTAL_VERTICES);  
+let vGridWeights = new Float32Array(TOTAL_VERTICES);
+
+let uGridPrevious = new Float32Array(TOTAL_VERTICES);  // For FLIP
+let vGridPrevious = new Float32Array(TOTAL_VERTICES);  // For FLIP
 
 const SOLID_CELL = 0;
 const FLUID_CELL = 1;
@@ -47,11 +52,16 @@ class Particle {
     }
 }
 
+/**
+ * Sets the current type of each cell in the simulation grid (solid, fluid, or empty).
+ */
 function markCellTypes() {
+    // Reset cell types and mark solid cells.
     for (let i = 0; i < TOTAL_CELLS; i++) {
         cellType[i] = solidCells[i] === 0 ? SOLID_CELL : EMPTY_CELL;
     }
 
+    // Mark cells containing particles as fluid cells.
     for (let particle of particles) {
         let gridX = Math.floor(particle.x * INVERSE_CELL_SPACING);
         let gridY = Math.floor(particle.y * INVERSE_CELL_SPACING);
@@ -63,9 +73,13 @@ function markCellTypes() {
     }
 }
 
+/**
+ * Initializes the solidCells array to define which grid cells are solid (walls) and which are not.
+ */
 function setupSolidCells() {
     solidCells.fill(1, 0);
 
+    // Mark the outermost layer of cells as solid.
     for (let gridX = 0; gridX < X_CELLS; gridX++) {
         for (let gridY = 0; gridY < Y_CELLS; gridY++) {
             if (gridX === 0 || gridY === 0 || gridX === X_CELLS - 1 || gridY === Y_CELLS - 1) {
@@ -76,6 +90,9 @@ function setupSolidCells() {
 }
 
 function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
+    // Store a copy of the current velocity grids for FLIP.
+    uGridPrevious.set(uGrid);
+    vGridPrevious.set(vGrid);
 
     for (let iteration = 0; iteration < numberOfIterations; iteration++) {
 
@@ -97,7 +114,7 @@ function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
                 let bottom = centre - X_CELLS;
                 let top = centre + X_CELLS;
 
-                // Check the solid status of the surrounding cells (0 = solid).
+                // Get the solid status of the surrounding cells (0 = solid).
                 let leftSolid = solidCells[left];
                 let rightSolid = solidCells[right];
                 let bottomSolid = solidCells[bottom];
@@ -106,139 +123,87 @@ function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
                 let surroundingSolid = leftSolid + rightSolid + bottomSolid + topSolid;
 
                 // Calculate the divergence of the current fluid cell.
-                let divergence = horizontalGridVelocities[right] - horizontalGridVelocities[centre] + verticalGridVelocities[top] - verticalGridVelocities[centre];
-                
-                let divergenceCorrection = divergence / surroundingSolid;
-                let relaxedDivergence = overRelaxation * divergenceCorrection;
+                let divergence = uGrid[right] - uGrid[centre] + vGrid[top] - vGrid[centre];
+                let relaxedDivergence = divergence * overRelaxation;
+                let divergenceCorrection = relaxedDivergence / surroundingSolid;
 
                 // Update grid velocities to zero the current cells divergence.
-                horizontalGridVelocities[centre] += leftSolid * relaxedDivergence;
-                horizontalGridVelocities[right] -= rightSolid * relaxedDivergence;
-                verticalGridVelocities[centre] += bottomSolid * relaxedDivergence;
-                verticalGridVelocities[top] -= topSolid * relaxedDivergence;
+                uGrid[centre] += leftSolid * divergenceCorrection;
+                uGrid[right] -= rightSolid * divergenceCorrection;
+                vGrid[centre] += bottomSolid * divergenceCorrection;
+                vGrid[top] -= topSolid * divergenceCorrection;
             }
         }
     }
 }
 
 function transferVelocitiesToParticles() {
-    let components = ['x', 'y'];
+    for (let component of ['x', 'y']) {
+        let { dx, dy, grid } = getComponentData(component);
 
-    for (let component of components) {
-        let dx = component === 'x' ? 0 : HALF_CELL_SPACING;
-        let dy = component === 'x' ? HALF_CELL_SPACING : 0;
+        let prevF = component === 'x' ? uGridPrevious : vGridPrevious;  // FIX ME
 
-        let grid = component === 'x' ? horizontalGridVelocities : verticalGridVelocities;
-        let gridWeights = component === 'x' ? horizontalGridWeights : verticalGridWeights;
+        for (let particle of particles) {
+            let { w1, w2, w3, w4, i1, i2, i3, i4 } = getWeightsAndIndices(particle, dx, dy);
 
-        for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
-            let particle = particles[i];
-
-            // Particle's position in the current velocity grid's coordinate system.
-            let x = particle.x - dx;
-            let y = particle.y - dy;
-
-            // Find the grid cell axis indices for the cell containing the current particle.
-            let gridX = Math.floor(x * INVERSE_CELL_SPACING);
-            let gridY = Math.floor(y * INVERSE_CELL_SPACING);
-
-            // Remainders of the particle's position in the grid cell.
-            let deltaX = x - gridX * CELL_SPACING;
-            let deltaY = y - gridY * CELL_SPACING;
-
-            // Bilinear interpolation weights for the four corners of the grid cell.
-            let w1 = (1 - deltaX * INVERSE_CELL_SPACING) * (1 - deltaY * INVERSE_CELL_SPACING);
-            let w2 = deltaX * INVERSE_CELL_SPACING * (1 - deltaY * INVERSE_CELL_SPACING);
-            let w3 = (deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
-            let w4 = (1 - deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
-
-            // Calculate the array indices of the four corners of the grid cell.
-            let bottomLeft = gridX + gridY * X_VERTICES;
-            let bottomRight = (gridX + 1) + gridY * X_VERTICES;
-            let topLeft = gridX + (gridY + 1) * X_VERTICES;
-            let topRight = (gridX + 1) + (gridY + 1) * X_VERTICES;
-
-            // FINISH THIS
+            // FIX ME
             var offset = component === 'x' ? X_CELLS : 1;
-            var valid0 = cellType[bottomLeft] != EMPTY_CELL || cellType[bottomLeft - offset] != EMPTY_CELL ? 1.0 : 0.0;
-            var valid1 = cellType[bottomRight] != EMPTY_CELL || cellType[bottomRight - offset] != EMPTY_CELL ? 1.0 : 0.0;
-            var valid2 = cellType[topRight] != EMPTY_CELL || cellType[topRight - offset] != EMPTY_CELL ? 1.0 : 0.0;
-            var valid3 = cellType[topLeft] != EMPTY_CELL || cellType[topLeft - offset] != EMPTY_CELL ? 1.0 : 0.0;
+            var valid0 = cellType[i1] != EMPTY_CELL || cellType[i1 - offset] != EMPTY_CELL ? 1.0 : 0.0;
+            var valid1 = cellType[i2] != EMPTY_CELL || cellType[i2 - offset] != EMPTY_CELL ? 1.0 : 0.0;
+            var valid2 = cellType[i3] != EMPTY_CELL || cellType[i3 - offset] != EMPTY_CELL ? 1.0 : 0.0;
+            var valid3 = cellType[i4] != EMPTY_CELL || cellType[i4 - offset] != EMPTY_CELL ? 1.0 : 0.0;
 
             var d = valid0 * w1 + valid1 * w2 + valid2 * w3 + valid3 * w4;
 
+            var v = component === 'x' ? particle.vx : particle.vy;
+
             if (d > 0.0) {
-                var picV = (valid0 * w1 * grid[bottomLeft] + valid1 * w2 * grid[bottomRight] + valid2 * w3 * grid[topRight] + valid3 * w4 * grid[topLeft]) / d;
+                var picV = (valid0 * w1 * grid[i1] + valid1 * w2 * grid[i2] + valid2 * w3 * grid[i3] + valid3 * w4 * grid[i4]) / d;
+                var corr = (valid0 * w1 * (grid[i1] - prevF[i1]) + valid1 * w2 * (grid[i2] - prevF[i2])
+								+ valid2 * w3 * (grid[i3] - prevF[i3]) + valid3 * w4 * (grid[i4] - prevF[i4])) / d;
+				var flipV = v + corr;
 
                 if (component === 'x') {
-                    particle.vx = picV;
+                    particle.vx = (1.0 - FLIP_RATIO) * picV + FLIP_RATIO * flipV;
                 } else {
-                    particle.vy = picV;
+                    particle.vy = (1.0 - FLIP_RATIO) * picV + FLIP_RATIO * flipV;
                 }
             }
+            // END FIX ME
         }
     }
 }
 
 function transferVelocitiesToGrid() {
     // Reset velocities and weights.
-    horizontalGridVelocities.fill(0, 0);
-    verticalGridVelocities.fill(0, 0);
-    horizontalGridWeights.fill(0, 0);
-    verticalGridWeights.fill(0, 0);
+    uGrid.fill(0, 0);
+    vGrid.fill(0, 0);
+    uGridWeights.fill(0, 0);
+    vGridWeights.fill(0, 0);
 
-    // Mark cell types.
     markCellTypes();
 
-    let components = ['x', 'y'];
+    for (let component of ['x', 'y']) {
+        let { dx, dy, grid } = getComponentData(component);
 
-    for (let component of components) {
-        let dx = component === 'x' ? 0 : HALF_CELL_SPACING;
-        let dy = component === 'x' ? HALF_CELL_SPACING : 0;
+        let gridWeights = component === 'x' ? uGridWeights : vGridWeights;
 
-        let grid = component === 'x' ? horizontalGridVelocities : verticalGridVelocities;
-        let gridWeights = component === 'x' ? horizontalGridWeights : verticalGridWeights;
-
-        for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
-            let particle = particles[i];
-
-            // Particle's position in the current velocity grid's coordinate system.
-            let x = particle.x - dx;
-            let y = particle.y - dy;
-
-            // Find the grid cell axis indices for the cell containing the current particle.
-            let gridX = Math.floor(x * INVERSE_CELL_SPACING);
-            let gridY = Math.floor(y * INVERSE_CELL_SPACING);
-
-            // Remainders of the particle's position in the grid cell.
-            let deltaX = x - gridX * CELL_SPACING;
-            let deltaY = y - gridY * CELL_SPACING;
-
-            // Bilinear interpolation weights for the four corners of the grid cell.
-            let w1 = (1 - deltaX * INVERSE_CELL_SPACING) * (1 - deltaY * INVERSE_CELL_SPACING);
-            let w2 = deltaX * INVERSE_CELL_SPACING * (1 - deltaY * INVERSE_CELL_SPACING);
-            let w3 = (deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
-            let w4 = (1 - deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING);
-
-            // Calculate the array indices of the four corners of the grid cell.
-            let bottomLeft = gridX + gridY * X_VERTICES;
-            let bottomRight = (gridX + 1) + gridY * X_VERTICES;
-            let topLeft = gridX + (gridY + 1) * X_VERTICES;
-            let topRight = (gridX + 1) + (gridY + 1) * X_VERTICES;
-
+        for (let particle of particles) {
+            let { w1, w2, w3, w4, i1, i2, i3, i4 } = getWeightsAndIndices(particle, dx, dy);
+            
             let particleVelocity = component === 'x' ? particle.vx : particle.vy;
 
             // Update the sum of weighted grid velocities at the four corners of the grid cell.
-            grid[bottomLeft] += w1 * particleVelocity;
-            grid[bottomRight] += w2 * particleVelocity;
-            grid[topRight] += w3 * particleVelocity;
-            grid[topLeft] += w4 * particleVelocity;
+            grid[i1] += w1 * particleVelocity;
+            grid[i2] += w2 * particleVelocity;
+            grid[i3] += w3 * particleVelocity;
+            grid[i4] += w4 * particleVelocity;
 
             // Update the sum of grid weights at the four corners of the grid cell.
-            gridWeights[bottomLeft] += w1;
-            gridWeights[bottomRight] += w2;
-            gridWeights[topRight] += w3;
-            gridWeights[topLeft] += w4;
+            gridWeights[i1] += w1;
+            gridWeights[i2] += w2;
+            gridWeights[i3] += w3;
+            gridWeights[i4] += w4;
         }
 
         for (let i = 0; i < TOTAL_VERTICES; i++) {
@@ -250,6 +215,41 @@ function transferVelocitiesToGrid() {
     }
 }
 
+function getComponentData(component) {
+    return {
+        dx: component === 'x' ? 0 : HALF_CELL_SPACING,
+        dy: component === 'x' ? HALF_CELL_SPACING : 0,
+        grid: component === 'x' ? uGrid : vGrid
+    }
+}
+
+function getWeightsAndIndices(particle, dx, dy) {
+    // Transform particle position into the given velocity grid’s coordinate system.
+    let x = particle.x - dx;
+    let y = particle.y - dy;
+
+    // Find the grid cell axis indices for the cell containing the current particle.
+    let gridX = Math.floor(x * INVERSE_CELL_SPACING);
+    let gridY = Math.floor(y * INVERSE_CELL_SPACING);
+
+    // Remainders of the particle's position in the grid cell.
+    let deltaX = x - gridX * CELL_SPACING;
+    let deltaY = y - gridY * CELL_SPACING;
+
+    // Bilinear interpolation weights and array indices (w1/i1 = bottom-left corner, counter-clockwise).
+    return {
+        w1: (1 - deltaX * INVERSE_CELL_SPACING) * (1 - deltaY * INVERSE_CELL_SPACING),
+        w2: deltaX * INVERSE_CELL_SPACING * (1 - deltaY * INVERSE_CELL_SPACING),
+        w3: (deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING),
+        w4: (1 - deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING),
+
+        i1: gridX + gridY * X_VERTICES,
+        i2: (gridX + 1) + gridY * X_VERTICES,
+        i3: (gridX + 1) + (gridY + 1) * X_VERTICES,
+        i4: gridX + (gridY + 1) * X_VERTICES
+    }
+}
+
 
 /**
  * Detects and resolves collisions between particles and walls in the simulation 
@@ -258,9 +258,7 @@ function transferVelocitiesToGrid() {
  * are the walls considered here.
  */
 function handleWallCollisions() {
-    for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
-        let particle = particles[i];
-
+    for (let particle of particles) {
         // Define the simulation bounds.
         let minX = PARTICLE_RADIUS + CELL_SPACING;
         let maxX = CANVAS_WIDTH - PARTICLE_RADIUS - CELL_SPACING;
@@ -285,7 +283,7 @@ function handleWallCollisions() {
             particle.vy = 0;
         }
 
-        // Collision with top wall
+        // Collision with top wall.
         if (particle.y > maxY) {
             particle.y = maxY; 
             particle.vy = 0;
@@ -297,12 +295,10 @@ function handleWallCollisions() {
  * Updates particle positions and velocities using Euler integration.
  *
  * @param {number} dt - Time step for integration.
- * @param {number} gravity - Vertical acceleration due to gravity (negative = down).
+ * @param {number} gravity - Vertical acceleration due to gravity.
  */
 function integrateParticles(dt, gravity) {
-    for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
-        let particle = particles[i];
-
+    for (let particle of particles) {
         // Apply gravity.
         particle.vy += gravity * dt;
 
@@ -312,35 +308,9 @@ function integrateParticles(dt, gravity) {
     }
 }
 
-// /**
-//  * Initialises the particle array by placing particles in a non-overlapping grid
-//  * on the lower-left half of the canvas. Each particle is initialised with zero 
-//  * velocity and a solid blue color.
-//  */
-// function createParticles() {
-//     const spacing = 2 * PARTICLE_RADIUS * 1.1;
-//     const particlesPerRow = Math.floor(0.5 * CANVAS_WIDTH / spacing);
-//     const rows = Math.ceil(NUMBER_OF_PARTICLES / particlesPerRow);
-
-//     let count = 0;
-//     for (let row = 0; row < rows; row++) {
-//         for (let col = 0; col < particlesPerRow; col++) {
-//             if (count >= NUMBER_OF_PARTICLES) break;
-//             const x = col * spacing + PARTICLE_RADIUS + CELL_SPACING;
-//             const y = row * spacing + PARTICLE_RADIUS + CELL_SPACING;
-//             const vx = 0.0;
-//             const vy = 0.0;
-//             const color = [0.0, 0.0, 1.0, 1.0];
-//             particles.push(new Particle(x, y, vx, vy, color));
-//             count++;
-//         }
-//     }
-// }
-
 /**
  * Initialises the particle array by placing particles in a staggered grid
- * on the lower-left half of the canvas. Particles alternate horizontal offsets 
- * every other row to create a more natural, less aligned distribution.
+ * on the lower-left half of the canvas. 
  */
 function createParticles() {
     const spacing = 2 * PARTICLE_RADIUS * 1.1;
@@ -349,20 +319,19 @@ function createParticles() {
 
     let count = 0;
     for (let row = 0; row < rows; row++) {
-        const xOffset = (row % 2 === 0) ? 0 : spacing * 0.5; // stagger every other row
+        const xOffset = (row % 2 === 0) ? 0 : spacing * 0.5;
         for (let col = 0; col < particlesPerRow; col++) {
             if (count >= NUMBER_OF_PARTICLES) break;
             const x = col * spacing + PARTICLE_RADIUS + CELL_SPACING + xOffset;
             const y = row * spacing + PARTICLE_RADIUS + CELL_SPACING;
             const vx = 0.0;
             const vy = 0.0;
-            const color = [0.0, 0.0, 1.0, 1.0];
+            const color = [0.0, 0.0, 1.0, 1];
             particles.push(new Particle(x, y, vx, vy, color));
             count++;
         }
     }
 }
-
 
 /**
  * Packs each particle's position (x, y) and color (r, g, b, a) into a Float32Array.
@@ -372,23 +341,22 @@ function createParticles() {
 function particlesToBuffer() {
     let bufferData = new Float32Array(NUMBER_OF_PARTICLES * 6);
     for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
-        let p = particles[i];
-        let pPositionNDC = simulationCoordinatesToNDC(p.x, p.y);
+        let particle = particles[i];
+        let particlePositionNDC = simulationCoordinatesToNDC(particle.x, particle.y);
 
-        bufferData[i * 6] = pPositionNDC.x;
-        bufferData[i * 6 + 1] = pPositionNDC.y;
-        bufferData[i * 6 + 2] = p.color[0];
-        bufferData[i * 6 + 3] = p.color[1];
-        bufferData[i * 6 + 4] = p.color[2];
-        bufferData[i * 6 + 5] = p.color[3];
+        bufferData[i * 6] = particlePositionNDC.x;
+        bufferData[i * 6 + 1] = particlePositionNDC.y;
+        bufferData[i * 6 + 2] = particle.color[0];
+        bufferData[i * 6 + 3] = particle.color[1];
+        bufferData[i * 6 + 4] = particle.color[2];
+        bufferData[i * 6 + 5] = particle.color[3];
     }
     return bufferData;
 }
 
 /**
  * Converts simulation coordinates (origin bottom-left) to Normalised Device Coordinates 
- * (NDC), where the origin is the centre of the screen and axes range from -1 to 1. WebGL 
- * expects coordinates in NDC space, so this conversion is necessary for rendering.
+ * (NDC), where the origin is the centre of the screen and axes range from -1 to 1.
  *
  * @param {number} x - X position in simulation space.
  * @param {number} y - Y position in simulation space.
@@ -400,6 +368,8 @@ function simulationCoordinatesToNDC(x, y) {
         y: (y / CANVAS_HEIGHT) * 2 - 1
     };
 }
+
+
 
 
 
@@ -482,9 +452,6 @@ gl.bufferData(gl.ARRAY_BUFFER, particlesBufferData, gl.DYNAMIC_DRAW);
 // bit float, thus 6 * 4 = 24 bytes per particle (recall 8 bits = 1 byte).
 gl.vertexAttribPointer(aPositionLocation, 2, gl.FLOAT, false, 6 * 4, 0);
 gl.vertexAttribPointer(aColorLocation, 4, gl.FLOAT, false, 6 * 4, 2 * 4);
-
-//gl.drawArrays(gl.POINTS, 0, NUMBER_OF_PARTICLES);
-
 
 
 
