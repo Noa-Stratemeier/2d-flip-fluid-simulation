@@ -1,12 +1,12 @@
 // SIMULATION PARAMETERS.
-FLIP_RATIO = 1;  // Ratio of FLIP to PIC in velocity transfer (i.e. 0.95 means 95% FLIP, 5% PIC)
+const FLIP_RATIO = 0;  // Ratio of FLIP to PIC in velocity transfer (i.e. 0.95 means 95% FLIP, 5% PIC)
 
-const GRAVITY = -200;
+const GRAVITY = -1100;
 const dt = 1.0 / 120.0;
 const numberOfDivergenceIterations = 50;
 const overRelaxation = 1.9;
 
-const NUMBER_OF_PARTICLES = 14000;
+const NUMBER_OF_PARTICLES = 12000;
 const PARTICLE_RADIUS = 3;
 
 const CELL_SPACING = 8;
@@ -52,6 +52,67 @@ class Particle {
     }
 }
 
+
+
+const SPATIAL_CELL_SPACING = 2.2 * PARTICLE_RADIUS;  // Spacing of the spatial grid cells for particle separation
+const INVERSE_SPATIAL_CELL_SPACING = 1.0 / SPATIAL_CELL_SPACING;
+const SPATIAL_X_CELLS = Math.ceil(CANVAS_WIDTH * INVERSE_SPATIAL_CELL_SPACING);
+const SPATIAL_Y_CELLS = Math.ceil(CANVAS_HEIGHT * INVERSE_SPATIAL_CELL_SPACING);
+const SPATIAL_TOTAL_CELLS = SPATIAL_X_CELLS * SPATIAL_Y_CELLS;
+
+let particleCountPerCell = new Int32Array(SPATIAL_TOTAL_CELLS);  // Number of particles in each spatial cell
+let partialSums = new Int32Array(SPATIAL_TOTAL_CELLS + 1)  // +1 for the guard
+let cellParticleIndices = new Int32Array(NUMBER_OF_PARTICLES);
+
+
+function separateParticles(numberOfIterations) {
+    particleCountPerCell.fill(0)
+
+    // Count the number of particles in each grid cell.
+    for (let particle of particles) {
+        let gridX = Math.floor(particle.x * INVERSE_SPATIAL_CELL_SPACING);
+        let gridY = Math.floor(particle.y * INVERSE_SPATIAL_CELL_SPACING);
+        let gridIndex = gridX + gridY * SPATIAL_X_CELLS;
+
+        particleCountPerCell[gridIndex]++;
+    }
+
+    // Compute partial sums.
+    let currentSum = 0;
+    for (let i = 0; i < SPATIAL_TOTAL_CELLS; i++) {
+        currentSum += particleCountPerCell[i];
+        partialSums[i] = currentSum;
+    }
+    partialSums[SPATIAL_TOTAL_CELLS] = currentSum;  // guard
+
+    // Store ordered particle indices.
+    for (let [i, particle] of particles.entries()) {
+        let gridX = Math.floor(particle.x * INVERSE_SPATIAL_CELL_SPACING);
+        let gridY = Math.floor(particle.y * INVERSE_SPATIAL_CELL_SPACING);
+        let gridIndex = gridX + gridY * SPATIAL_X_CELLS;
+        
+        // Move the insertion index one step back.
+        partialSums[gridIndex]--;
+
+        // Add the particle index at the insertion index.
+        cellParticleIndices[partialSums[gridIndex]] = i;
+    }
+
+    for (let iteration = 0; iteration < numberOfIterations; iteration++) {
+        for (let particle of particles) {
+            // Find the cell it's in and the 8 direct neighbours
+
+            // for each particle in the 9 cells compute the distance between them
+            // and push overlapping particles apart. Remember to skip the particle
+            // current particle in this loop
+        }
+    }
+
+
+}
+
+
+
 /**
  * Sets the current type of each cell in the simulation grid (solid, fluid, or empty).
  */
@@ -65,8 +126,8 @@ function markCellTypes() {
     for (let particle of particles) {
         let gridX = Math.floor(particle.x * INVERSE_CELL_SPACING);
         let gridY = Math.floor(particle.y * INVERSE_CELL_SPACING);
-
         let gridIndex = gridX + gridY * X_CELLS;
+
         if (cellType[gridIndex] === EMPTY_CELL) {
             cellType[gridIndex] = FLUID_CELL;
         }
@@ -458,6 +519,7 @@ gl.vertexAttribPointer(aColorLocation, 4, gl.FLOAT, false, 6 * 4, 2 * 4);
 
 function animate() {
     integrateParticles(dt, GRAVITY);
+    // separateParticles(2);
     handleWallCollisions();
     transferVelocitiesToGrid();
     solveIncompressibility(numberOfDivergenceIterations, dt, overRelaxation);

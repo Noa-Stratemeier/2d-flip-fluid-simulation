@@ -13,9 +13,13 @@ function better.
 
 - Improve FLIP Code.
 
+- array.fill(0) = array.fill(0, 0).
+
+- check 'for (const [index, element] of foobar.entries())', maybe storing particle velocities and positions directly in separate arrays is better.
+
 
 
 COMPLETE:
 - Separate particles using spatial hashing.
 
-- Add a pressure grid (reduce divergence in dense regions and vice versa).
+- Add a pressure grid to compensate for drift (reduce divergence in dense regions and vice versa).
