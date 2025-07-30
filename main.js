@@ -6,13 +6,13 @@ const dt = 1.0 / 120.0;
 const numberOfDivergenceIterations = 50;
 const overRelaxation = 1.9;
 
-const NUMBER_OF_PARTICLES = 12000;
+const NUMBER_OF_PARTICLES = 14000;
 const PARTICLE_RADIUS = 3;
 
 const CELL_SPACING = 8;
 const HALF_CELL_SPACING = CELL_SPACING / 2;
 const INVERSE_CELL_SPACING = 1 / CELL_SPACING;
-const X_CELLS = 200;
+const X_CELLS = 220;
 const Y_CELLS = 100;
 const TOTAL_CELLS = X_CELLS * Y_CELLS;
 
@@ -91,24 +91,75 @@ function separateParticles(numberOfIterations) {
         let gridY = Math.floor(particle.y * INVERSE_SPATIAL_CELL_SPACING);
         let gridIndex = gridX + gridY * SPATIAL_X_CELLS;
         
-        // Move the insertion index one step back.
+        // Move the insertion index back one step.
         partialSums[gridIndex]--;
 
         // Add the particle index at the insertion index.
         cellParticleIndices[partialSums[gridIndex]] = i;
     }
 
+    let minDist = 2 * PARTICLE_RADIUS;
+    let minDistSquared = minDist * minDist;
     for (let iteration = 0; iteration < numberOfIterations; iteration++) {
-        for (let particle of particles) {
+        for (let [i, particle] of particles.entries()) {
             // Find the cell it's in and the 8 direct neighbours
 
             // for each particle in the 9 cells compute the distance between them
-            // and push overlapping particles apart. Remember to skip the particle
+            // and push overlapping particles apart. Remember to skip the
             // current particle in this loop
+
+            let gridX = Math.floor(particle.x * INVERSE_SPATIAL_CELL_SPACING);
+            let gridY = Math.floor(particle.y * INVERSE_SPATIAL_CELL_SPACING);
+
+            let minGridX = Math.max(0, gridX - 1);
+            let maxGridX = Math.min(SPATIAL_X_CELLS - 1, gridX + 1)
+            let minGridY = Math.max(0, gridY - 1);
+            let maxGridY = Math.min(SPATIAL_Y_CELLS - 1, gridY + 1)
+
+            for (let currentGridX = minGridX; currentGridX < maxGridX; currentGridX++) {
+                for (let currentGridY = minGridY; currentGridY < maxGridY; currentGridY++) {
+                    let currentGridIndex = currentGridX + currentGridY * SPATIAL_X_CELLS;
+
+                    let startIndex = partialSums[currentGridIndex];
+                    let endIndex = partialSums[currentGridIndex + 1];
+
+                    for (let j = startIndex; j < endIndex; j++) {
+                        let particleIndex = cellParticleIndices[j];
+
+                        // Skip the current particle.
+                        if (i === particleIndex) {
+                            continue;
+                        }
+
+                        let neighbour = particles[particleIndex];
+
+                        // Compute the displacement between the particles
+                        let dx = neighbour.x - particle.x;
+                        let dy = neighbour.y - particle.y;
+                        let distSq = dx * dx + dy * dy;
+
+                        if (distSq < minDistSquared && distSq > 0.0001) {
+                            let dist = Math.sqrt(distSq);
+
+                            // Normalized displacement vector
+                            let nx = dx / dist;
+                            let ny = dy / dist;
+
+                            // Overlap amount
+                            let overlap = 0.5 * (minDist - dist);
+
+                            // Push each particle away from each other
+                            particle.x -= nx * overlap;
+                            particle.y -= ny * overlap;
+
+                            neighbour.x += nx * overlap;
+                            neighbour.y += ny * overlap;
+                        }
+                    }
+                }
+            }
         }
     }
-
-
 }
 
 
@@ -519,7 +570,7 @@ gl.vertexAttribPointer(aColorLocation, 4, gl.FLOAT, false, 6 * 4, 2 * 4);
 
 function animate() {
     integrateParticles(dt, GRAVITY);
-    // separateParticles(2);
+    separateParticles(2);
     handleWallCollisions();
     transferVelocitiesToGrid();
     solveIncompressibility(numberOfDivergenceIterations, dt, overRelaxation);
@@ -536,5 +587,3 @@ function animate() {
     requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
-
-
