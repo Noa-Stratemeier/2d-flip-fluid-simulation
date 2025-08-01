@@ -1,8 +1,10 @@
 // SIMULATION PARAMETERS.
-const FLIP_RATIO = 0;  // Ratio of FLIP to PIC in velocity transfer (i.e. 0.95 means 95% FLIP, 5% PIC)
+const STIFFNESS = 10.0;
 
-const GRAVITY = -1100;
-const dt = 1.0 / 120.0;
+const FLIP_RATIO = 0.95;  // Ratio of FLIP to PIC in velocity transfer (i.e. 0.95 means 95% FLIP, 5% PIC)
+
+const GRAVITY = -1000;
+const dt = 1.0 / 60.0;
 const numberOfDivergenceIterations = 50;
 const overRelaxation = 1.9;
 
@@ -20,7 +22,7 @@ const CANVAS_WIDTH = X_CELLS * CELL_SPACING;
 const CANVAS_HEIGHT = Y_CELLS * CELL_SPACING;
 
 // Vertices for the velocity grids (note, these grids are one cell smaller than the simulation grid in x and y, they are shifted by half a cell spacing).
-// The vertical velocity grid is shifted to the right, and the horizontal velocity grid is shifted up.
+// The vertical velocity grid is shifted to the right, and the horizontal velocity grid is shifted up (relative to the origin (bottom left corner of screen)).
 const X_VERTICES = X_CELLS;
 const Y_VERTICES = Y_CELLS;
 const TOTAL_VERTICES = TOTAL_CELLS;
@@ -52,6 +54,46 @@ class Particle {
     }
 }
 
+
+// This grid has vertices at the centers of cell faces (i.e., it is shifted half a cell up and half a cell right from the origin).
+let densityGrid = new Float32Array(TOTAL_VERTICES)  // Note, this stores the cell vertices of this grid, not the cells.
+let restDensity = 0.0;
+
+function updateDensityGrid() {
+    densityGrid.fill(0.0);
+
+    for (let particle of particles) {
+        let { w1, w2, w3, w4, i1, i2, i3, i4 } = getWeightsAndIndices(particle, HALF_CELL_SPACING, HALF_CELL_SPACING);
+
+        if (!isBorderCell(i1)) densityGrid[i1] += w1;
+        if (!isBorderCell(i2)) densityGrid[i2] += w2;
+        if (!isBorderCell(i3)) densityGrid[i3] += w3;
+        if (!isBorderCell(i4)) densityGrid[i4] += w4;
+    }
+
+    if (restDensity === 0.0) {
+        let densitySum = 0.0;
+        let fluidCellCount = 0;
+
+        for (let i = 0; i < TOTAL_CELLS; i++) {
+            if (cellType[i] === FLUID_CELL) {
+                densitySum += densityGrid[i];
+                fluidCellCount++;
+            }
+        }
+
+        if (fluidCellCount > 0) {
+            restDensity = densitySum / fluidCellCount;
+        }
+    }
+}
+
+function isBorderCell(index) {
+    let x = index % (X_CELLS);
+    let y = Math.floor(index / (X_CELLS));
+
+    return x === 0 || x === X_CELLS || y === 0 || y === Y_CELLS;
+}
 
 
 const SPATIAL_CELL_SPACING = 2.2 * PARTICLE_RADIUS;  // Spacing of the spatial grid cells for particle separation
@@ -211,14 +253,15 @@ function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
         // Loop over simulation grid, ignoring the outermost layer of cells (as these are walls).
         for (let gridX = 1; gridX < X_CELLS - 1; gridX++) {
             for (let gridY = 1; gridY < Y_CELLS - 1; gridY++) {
+                let currentGridIndex = gridX + gridY * X_CELLS;
 
                 // Skip non-fluid cells.
-                if (cellType[gridX + gridY * X_CELLS] !== FLUID_CELL) {
+                if (cellType[currentGridIndex] !== FLUID_CELL) {
                     continue;
                 }
 
                 // Get the array index of the current fluid cell.
-                let centre = gridX + gridY * X_CELLS
+                let centre = currentGridIndex;
 
                 // Get the array indices of the surrounding cells.
                 let left = centre - 1;
@@ -234,10 +277,19 @@ function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
 
                 let surroundingSolid = leftSolid + rightSolid + bottomSolid + topSolid;
 
-                // Calculate the divergence of the current fluid cell.
+                // Calculate divergence of the cell and apply over relaxation.
                 let divergence = uGrid[right] - uGrid[centre] + vGrid[top] - vGrid[centre];
-                let relaxedDivergence = divergence * overRelaxation;
-                let divergenceCorrection = relaxedDivergence / surroundingSolid;
+                divergence *= overRelaxation;
+
+                // Modify divergence based on particle density (reduce divergence in dense regions and vice versa).
+                if (restDensity > 0.0) {
+                    let k = STIFFNESS;  // Stiffness coefficient.
+                    let compression = densityGrid[currentGridIndex] - restDensity;
+                    if (compression > 0.0)
+                        divergence -= k * compression;
+                }
+
+                let divergenceCorrection = divergence / surroundingSolid;
 
                 // Update grid velocities to zero the current cells divergence.
                 uGrid[centre] += leftSolid * divergenceCorrection;
@@ -470,8 +522,8 @@ function particlesToBuffer() {
  * Converts simulation coordinates (origin bottom-left) to Normalised Device Coordinates 
  * (NDC), where the origin is the centre of the screen and axes range from -1 to 1.
  *
- * @param {number} x - X position in simulation space.
- * @param {number} y - Y position in simulation space.
+ * @param {number} x - X coordinate in simulation space.
+ * @param {number} y - Y coordinate in simulation space.
  * @returns {{x: number, y: number}} An object containing x and y in NDC space.
  */
 function simulationCoordinatesToNDC(x, y) {
@@ -515,8 +567,8 @@ void main() {
     fragColor = vec4(vColor);
 
     // Convert square point into a circle
-    vec2 circCoord = 2.0 * gl_PointCoord - 1.0;
-    if (dot(circCoord, circCoord) > 1.0) {
+    vec2 circleCoord = 2.0 * gl_PointCoord - 1.0;
+    if (dot(circleCoord, circleCoord) > 1.0) {
         discard;
     }
 }`;
@@ -573,6 +625,8 @@ function animate() {
     separateParticles(2);
     handleWallCollisions();
     transferVelocitiesToGrid();
+    updateDensityGrid();
+    console.log(densityGrid);
     solveIncompressibility(numberOfDivergenceIterations, dt, overRelaxation);
     transferVelocitiesToParticles();
 
@@ -580,7 +634,7 @@ function animate() {
     gl.bindBuffer(gl.ARRAY_BUFFER, particlesBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, bufferData, gl.DYNAMIC_DRAW);
 
-    gl.clearColor(0, 0, 0, 1);  // Black background
+    gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.POINTS, 0, particles.length);
 

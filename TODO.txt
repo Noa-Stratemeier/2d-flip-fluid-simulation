@@ -17,9 +17,10 @@ function better.
 
 - check 'for (const [index, element] of foobar.entries())', maybe storing particle velocities and positions directly in separate arrays is better.
 
+- get rid of const in drawing logic.
 
+- Check separate particles.
 
-COMPLETE:
-- Separate particles using spatial hashing.
+- Get naming conventions right gridIndex vs currentGridIndex (don't use current) ALSO get rid of X_CELL and X_VERTICES
 
-- Add a pressure grid to compensate for drift (reduce divergence in dense regions and vice versa).
+- use if shorthand for one line if statements
