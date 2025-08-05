@@ -548,22 +548,65 @@ class FlipFluidSimulation {
         return particlePositionsNDC;
     }
 
-    stepSimulation(dt, gravity, flipRatio, overRelaxation, particleSeparationIterations, projectionIterations, stiffnessConstant) {
-        let subSteps = 1;
-        let sdt = dt / subSteps;
+    /**
+     * Applies a circular repulsive force to particles within a given radius of a point.
+     *
+     * @param {number} x - X-coordinate of the point.
+     * @param {number} y - Y-coordinate of the point.
+     * @param {number} radius - Radius of influence.
+     * @param {number} strength - Strength of the repulsive force.
+     */
+    repelParticles(x, y, radius, strength) {
+        let positions = this.particlePositions;
+        let velocities = this.particleVelocities;
 
-        for (let step = 0; step < subSteps; step++) {
-            this.integrateParticles(sdt, gravity);
-            this.separateParticles(particleSeparationIterations);
-            this.handleWallCollisions();
-            this.transferVelocitiesToGrid();
-            this.markCellTypes();
-            this.updateDensityGrid();
-            this.solveIncompressibility(projectionIterations, overRelaxation, stiffnessConstant);
-            this.transferVelocitiesToParticles(flipRatio);
+        let radiusSquared = radius * radius;
+        
+        // Apply repulsive force to each particle within the radius of influence.
+        for (let i = 0; i < this.particleCount; i++) {
+            let xi = 2 * i;
+            let yi = 2 * i + 1;
+            
+            // Vector from the point to the particle.
+            let dx = positions[xi] - x;
+            let dy = positions[yi] - y;
+
+            let distanceSquared = dx * dx + dy * dy;
+            
+            if (distanceSquared < radiusSquared && distanceSquared != 0) {
+                let distance = Math.sqrt(distanceSquared);
+
+                let ndx = dx / distance;
+                let ndy = dy / distance;
+
+                // Quadratic falloff (stronger near the center, weaker at the edge).
+                let falloff = Math.pow(1 - distance / radius, 2);
+
+                let interactionForceX = (ndx * strength - velocities[xi]) * falloff;
+                let interactionForceY = (ndy * strength - velocities[yi]) * falloff;
+                
+                velocities[xi] += interactionForceX;
+                velocities[yi] += interactionForceY;
+            }
         }
     }
+
+    stepSimulation(dt, gravity, flipRatio, overRelaxation, particleSeparationIterations, projectionIterations, stiffnessConstant) {
+        this.integrateParticles(dt, gravity);
+        this.separateParticles(particleSeparationIterations);
+        this.handleWallCollisions();
+        this.transferVelocitiesToGrid();
+        this.markCellTypes();
+        this.updateDensityGrid();
+        this.solveIncompressibility(projectionIterations, overRelaxation, stiffnessConstant);
+        this.transferVelocitiesToParticles(flipRatio);
+    }
 }
+
+
+
+
+
 
 
 
@@ -574,16 +617,14 @@ class FlipFluidSimulation {
 let scene = 
 {   
     // Tank.
-    tankWidth: window.innerWidth - 200,
-    tankHeight: window.innerHeight - 100,
+    tankWidth: window.innerWidth - 30,
+    tankHeight: window.innerHeight - 30,
     resolution: 80,
-
-    // Fluid initialisation.
     relativeFluidWidth: 0.6,
     relativeFluidHeight: 0.7,
 
     // Simulation.
-    gravity: -500,
+    gravity: -400,
     dt: 1.0 / 60.0,
     flipRatio: 0.95,
     projectionIterations: 60,
@@ -591,7 +632,11 @@ let scene =
     overRelaxation: 1.9,
     stiffnessConstant: 500.0,
 
-    flipFluidSimulation: null
+    flipFluidSimulation: null,
+
+    // Interaction.
+    cursorRepelRadius: 50,
+    cursorRepelStrength: 1000,
 };
 
 function initialiseScene() {
@@ -639,7 +684,7 @@ function initialiseScene() {
         f.particleColours[bi] = 1.0;
     }
 
-    // Initialise solid cell mask.
+    // Initialise solid cells.
     for (let gridX = 0; gridX < cellCountX; gridX++) {
         for (let gridY = 0; gridY < cellCountY; gridY++) {
             if (gridX === 0 || gridY === 0 || gridX === cellCountX - 1 || gridY === cellCountY - 1) {
@@ -759,3 +804,25 @@ function animate() {
     requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
+
+
+
+
+
+
+
+// Set up mouse interaction.
+canvas.addEventListener('mousedown', handleMouseInteraction);
+canvas.addEventListener('mousemove', handleMouseInteraction);
+
+function handleMouseInteraction(e) {
+    if (e.buttons !== 1) return;  // Only left mouse button.
+    
+    // Get mouse position in simulation coordinates.
+    let rect = canvas.getBoundingClientRect();
+    let mouseX = e.clientX - rect.left;
+    let mouseY = rect.height - (e.clientY - rect.top);  // Flip Y axis.
+    
+    // Push particles away from mouse.
+    scene.flipFluidSimulation.repelParticles(mouseX, mouseY, scene.cursorRepelRadius, scene.cursorRepelStrength);
+}

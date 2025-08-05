@@ -1,6 +1,7 @@
 TODO:
 PRIORITY:
 - Improve render code.
+- Have particles be coloured based on speed (need to add colour buffer).
 
 
 GENERAL:
