@@ -1,26 +1,29 @@
-FIX:
+TODO:
+PRIORITY:
+- Improve render code.
+
+
+GENERAL:
+- Maybe look at implementing Runge-Kutta integration for integrateParticles function.
 - Rewrite createParticles() function, currently points can be placed intersecting the 
-top of the screen if NUMBER_OF_PARTICLES is set too large. Also should just write the
+top of the screen if the particle count is set too large. Also should just write the
 function better.
+- Look to scale gravity in a way so users constant makes more sense (so -9.81 approximates reality).
 
-- Check animate() function.
 
-- Fix transfer velocities to particles code.
+PERFORMANCE:
+- Check performance loss from adding getComponentData and getWeightsAndIndices functions. 
+- Check performance gain from preassigning 'let x = this.x'.
+- Check performance gain from precomputing terms in the weight calculations.
 
-- Refactor the code, current state is embarrassing.
 
-- Fix drawing logic. Use transform feedback.
+CODE REFACTORING:
+- Maybe replace xi, yi with helper functions.
+- Maybe reduce code repetition.
+- Separate particles function is pretty ugly.
+- Maybe put markCellTypes out of transferVelocitiesToGrid function.
+- Maybe put function to compute rest density in its own method.
 
-- Improve FLIP Code.
 
-- array.fill(0) = array.fill(0, 0).
-
-- check 'for (const [index, element] of foobar.entries())', maybe storing particle velocities and positions directly in separate arrays is better.
-
-- get rid of const in drawing logic.
-
-- Check separate particles.
-
-- Get naming conventions right gridIndex vs currentGridIndex (don't use current) ALSO get rid of X_CELL and X_VERTICES
-
-- use if shorthand for one line if statements
+BUGS:
+- setting resolution to 90 causes bug in particle spawns.

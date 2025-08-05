@@ -1,536 +1,654 @@
-// SIMULATION PARAMETERS.
-const STIFFNESS = 10.0;
-
-const FLIP_RATIO = 0.95;  // Ratio of FLIP to PIC in velocity transfer (i.e. 0.95 means 95% FLIP, 5% PIC)
-
-const GRAVITY = -1000;
-const dt = 1.0 / 60.0;
-const numberOfDivergenceIterations = 50;
-const overRelaxation = 1.9;
-
-const NUMBER_OF_PARTICLES = 14000;
-const PARTICLE_RADIUS = 3;
-
-const CELL_SPACING = 8;
-const HALF_CELL_SPACING = CELL_SPACING / 2;
-const INVERSE_CELL_SPACING = 1 / CELL_SPACING;
-const X_CELLS = 220;
-const Y_CELLS = 100;
-const TOTAL_CELLS = X_CELLS * Y_CELLS;
-
-const CANVAS_WIDTH = X_CELLS * CELL_SPACING;
-const CANVAS_HEIGHT = Y_CELLS * CELL_SPACING;
-
-// Vertices for the velocity grids (note, these grids are one cell smaller than the simulation grid in x and y, they are shifted by half a cell spacing).
-// The vertical velocity grid is shifted to the right, and the horizontal velocity grid is shifted up (relative to the origin (bottom left corner of screen)).
-const X_VERTICES = X_CELLS;
-const Y_VERTICES = Y_CELLS;
-const TOTAL_VERTICES = TOTAL_CELLS;
-let uGrid = new Float32Array(TOTAL_VERTICES);  // Note, these store the cell vertices of these grids, not the cells
-let vGrid = new Float32Array(TOTAL_VERTICES);
-let uGridWeights = new Float32Array(TOTAL_VERTICES);  
-let vGridWeights = new Float32Array(TOTAL_VERTICES);
-
-let uGridPrevious = new Float32Array(TOTAL_VERTICES);  // For FLIP
-let vGridPrevious = new Float32Array(TOTAL_VERTICES);  // For FLIP
-
 const SOLID_CELL = 0;
 const FLUID_CELL = 1;
 const EMPTY_CELL = 2;
-let cellType = new Float32Array(TOTAL_CELLS); 
-let solidCells = new Float32Array(TOTAL_CELLS);  // 0 = solid, 1 = not
 
+class FlipFluidSimulation {
+    constructor(particleCount, particleRadius, cellCountX, cellCountY, cellSize) {
+        this.particleCount = particleCount;
+        this.particleRadius = particleRadius;
+        this.particlePositions = new Float32Array(this.particleCount * 2);  // (x, y).
+        this.particleVelocities = new Float32Array(this.particleCount * 2);  // (vx, vy).
+        this.particleColours = new Float32Array(this.particleCount * 3);  // (r, g, b).
 
-let particles = [];
+        this.cellCountX = cellCountX;
+        this.cellCountY = cellCountY;
+        this.cellCount = cellCountX * cellCountY;
 
+        this.cellSize = cellSize;
+        this.halfCellSize = cellSize / 2.0;
+        this.inverseCellSize = 1.0 / cellSize;
 
-class Particle {
-    constructor(x, y, vx, vy, color) {
-        this.x = x;
-        this.y = y;
-        this.vx = vx;
-        this.vy = vy;
-        this.color = color;
+        this.cellType = new Int32Array(this.cellCount); 
+        this.solidCells = new Int32Array(this.cellCount);
+
+        this.width = cellCountX * cellSize;
+        this.height = cellCountY * cellSize;
+
+        this.uGrid = new Float32Array(this.cellCount);
+        this.vGrid = new Float32Array(this.cellCount);
+        this.uGridPrevious = new Float32Array(this.cellCount);
+        this.vGridPrevious = new Float32Array(this.cellCount);
+        this.uGridWeights = new Float32Array(this.cellCount);
+        this.vGridWeights = new Float32Array(this.cellCount);
+
+        this.restDensity = 0.0;
+        this.densityGrid = new Float32Array(this.cellCount);
+
+        this.spatialCellSize = 2.2 * this.particleRadius;
+        this.inverseSpatialCellSize = 1.0 / this.spatialCellSize;
+        this.spatialCellCountX = Math.ceil(this.width * this.inverseSpatialCellSize);
+        this.spatialCellCountY = Math.ceil(this.height * this.inverseSpatialCellSize);
+        this.spatialCellCount = this.spatialCellCountX * this.spatialCellCountY;
+        this.particleCountPerCell = new Int32Array(this.spatialCellCount);
+        this.partialSums = new Int32Array(this.spatialCellCount + 1)
+        this.cellParticleIndices = new Int32Array(this.particleCount);
     }
-}
 
+    /**
+     * Updates particle positions and velocities using semi-implicit Euler integration.
+     *
+     * @param {number} dt - Time step size.
+     * @param {number} gravity - Acceleration due to gravity.
+     */
+    integrateParticles(dt, gravity) {
+        let positions = this.particlePositions;
+        let velocities = this.particleVelocities;
 
-// This grid has vertices at the centers of cell faces (i.e., it is shifted half a cell up and half a cell right from the origin).
-let densityGrid = new Float32Array(TOTAL_VERTICES)  // Note, this stores the cell vertices of this grid, not the cells.
-let restDensity = 0.0;
+        for (let i = 0; i < this.particleCount; i++) {
+            let xi = 2 * i;
+            let yi = 2 * i + 1;
 
-function updateDensityGrid() {
-    densityGrid.fill(0.0);
+            velocities[yi] += gravity * dt;
 
-    for (let particle of particles) {
-        let { w1, w2, w3, w4, i1, i2, i3, i4 } = getWeightsAndIndices(particle, HALF_CELL_SPACING, HALF_CELL_SPACING);
-
-        if (!isBorderCell(i1)) densityGrid[i1] += w1;
-        if (!isBorderCell(i2)) densityGrid[i2] += w2;
-        if (!isBorderCell(i3)) densityGrid[i3] += w3;
-        if (!isBorderCell(i4)) densityGrid[i4] += w4;
+            positions[xi] += velocities[xi] * dt;
+            positions[yi] += velocities[yi] * dt;
+        }
     }
 
-    if (restDensity === 0.0) {
-        let densitySum = 0.0;
-        let fluidCellCount = 0;
+    separateParticles(numberOfIterations) {
+        let inverseSpatialCellSize = this.inverseSpatialCellSize;
+        let spatialCellCountX = this.spatialCellCountX;
+        let spatialCellCountY = this.spatialCellCountY;
+        let particleCountPerCell = this.particleCountPerCell;
+        let partialSums = this.partialSums;
+        let cellParticleIndices = this.cellParticleIndices;
+        let positions = this.particlePositions;
 
-        for (let i = 0; i < TOTAL_CELLS; i++) {
-            if (cellType[i] === FLUID_CELL) {
-                densitySum += densityGrid[i];
-                fluidCellCount++;
-            }
+        particleCountPerCell.fill(0)
+
+        // Count the number of particles in each grid cell.
+        for (let i = 0; i < this.particleCount; i++) {
+            let xi = 2 * i;
+            let yi = 2 * i + 1;
+
+            let gridX = Math.floor(positions[xi] * inverseSpatialCellSize);
+            let gridY = Math.floor(positions[yi] * inverseSpatialCellSize);
+            let gridIndex = gridX + gridY * spatialCellCountX;
+
+            particleCountPerCell[gridIndex]++;
         }
 
-        if (fluidCellCount > 0) {
-            restDensity = densitySum / fluidCellCount;
+        // Compute partial sums.
+        let currentSum = 0;
+        for (let i = 0; i < this.spatialCellCount; i++) {
+            currentSum += particleCountPerCell[i];
+            partialSums[i] = currentSum;
         }
-    }
-}
+        partialSums[this.spatialCellCount] = currentSum;  // Guard.
 
-function isBorderCell(index) {
-    let x = index % (X_CELLS);
-    let y = Math.floor(index / (X_CELLS));
+        // Store ordered particle indices.
+        for (let i = 0; i < this.particleCount; i++) {
+            let xi = 2 * i;
+            let yi = 2 * i + 1;
 
-    return x === 0 || x === X_CELLS || y === 0 || y === Y_CELLS;
-}
+            let gridX = Math.floor(positions[xi] * inverseSpatialCellSize);
+            let gridY = Math.floor(positions[yi] * inverseSpatialCellSize);
+            let gridIndex = gridX + gridY * spatialCellCountX;
+            
+            // Move the insertion index back one step.
+            partialSums[gridIndex]--;
 
+            // Add the particle index at the insertion index.
+            cellParticleIndices[partialSums[gridIndex]] = i;
+        }
 
-const SPATIAL_CELL_SPACING = 2.2 * PARTICLE_RADIUS;  // Spacing of the spatial grid cells for particle separation
-const INVERSE_SPATIAL_CELL_SPACING = 1.0 / SPATIAL_CELL_SPACING;
-const SPATIAL_X_CELLS = Math.ceil(CANVAS_WIDTH * INVERSE_SPATIAL_CELL_SPACING);
-const SPATIAL_Y_CELLS = Math.ceil(CANVAS_HEIGHT * INVERSE_SPATIAL_CELL_SPACING);
-const SPATIAL_TOTAL_CELLS = SPATIAL_X_CELLS * SPATIAL_Y_CELLS;
+        let minDistance = 2 * this.particleRadius;
+        let minDistanceSquared = minDistance * minDistance;
+        for (let iteration = 0; iteration < numberOfIterations; iteration++) {
+            // For each particle, check and resolve overlaps with neighbors in adjacent spatial cells (3×3 region).
+            for (let i = 0; i < this.particleCount; i++) {
+                let xi = 2 * i;
+                let yi = 2 * i + 1;
+  
+                let gridX = Math.floor(positions[xi] * inverseSpatialCellSize);
+                let gridY = Math.floor(positions[yi] * inverseSpatialCellSize);
 
-let particleCountPerCell = new Int32Array(SPATIAL_TOTAL_CELLS);  // Number of particles in each spatial cell
-let partialSums = new Int32Array(SPATIAL_TOTAL_CELLS + 1)  // +1 for the guard
-let cellParticleIndices = new Int32Array(NUMBER_OF_PARTICLES);
+                let minGridX = Math.max(0, gridX - 1);
+                let maxGridX = Math.min(spatialCellCountX - 1, gridX + 1)
+                let minGridY = Math.max(0, gridY - 1);
+                let maxGridY = Math.min(spatialCellCountY - 1, gridY + 1)
 
+                for (let gridX = minGridX; gridX <= maxGridX; gridX++) {
+                    for (let gridY = minGridY; gridY <= maxGridY; gridY++) {
+                        let gridIndex = gridX + gridY * spatialCellCountX;
 
-function separateParticles(numberOfIterations) {
-    particleCountPerCell.fill(0)
+                        let startIndex = partialSums[gridIndex];
+                        let endIndex = partialSums[gridIndex + 1];
 
-    // Count the number of particles in each grid cell.
-    for (let particle of particles) {
-        let gridX = Math.floor(particle.x * INVERSE_SPATIAL_CELL_SPACING);
-        let gridY = Math.floor(particle.y * INVERSE_SPATIAL_CELL_SPACING);
-        let gridIndex = gridX + gridY * SPATIAL_X_CELLS;
+                        for (let j = startIndex; j < endIndex; j++) {
+                            let neighbourParticleIndex = cellParticleIndices[j];
 
-        particleCountPerCell[gridIndex]++;
-    }
+                            // Skip the current particle.
+                            if (i === neighbourParticleIndex) continue;
 
-    // Compute partial sums.
-    let currentSum = 0;
-    for (let i = 0; i < SPATIAL_TOTAL_CELLS; i++) {
-        currentSum += particleCountPerCell[i];
-        partialSums[i] = currentSum;
-    }
-    partialSums[SPATIAL_TOTAL_CELLS] = currentSum;  // guard
+                            let dx = positions[2 * neighbourParticleIndex] - positions[2 * i];
+                            let dy = positions[2 * neighbourParticleIndex + 1] - positions[2 * i + 1];
+                            let distanceSquared = dx * dx + dy * dy;
 
-    // Store ordered particle indices.
-    for (let [i, particle] of particles.entries()) {
-        let gridX = Math.floor(particle.x * INVERSE_SPATIAL_CELL_SPACING);
-        let gridY = Math.floor(particle.y * INVERSE_SPATIAL_CELL_SPACING);
-        let gridIndex = gridX + gridY * SPATIAL_X_CELLS;
-        
-        // Move the insertion index back one step.
-        partialSums[gridIndex]--;
+                            if (distanceSquared < minDistanceSquared && distanceSquared != 0.0) {
+                                let distance = Math.sqrt(distanceSquared);
 
-        // Add the particle index at the insertion index.
-        cellParticleIndices[partialSums[gridIndex]] = i;
-    }
+                                let ndx = dx / distance;
+                                let ndy = dy / distance;
 
-    let minDist = 2 * PARTICLE_RADIUS;
-    let minDistSquared = minDist * minDist;
-    for (let iteration = 0; iteration < numberOfIterations; iteration++) {
-        for (let [i, particle] of particles.entries()) {
-            // Find the cell it's in and the 8 direct neighbours
+                                let overlap = 0.5 * (minDistance - distance);
 
-            // for each particle in the 9 cells compute the distance between them
-            // and push overlapping particles apart. Remember to skip the
-            // current particle in this loop
+                                positions[2 * i] -= ndx * overlap;
+                                positions[2 * i + 1] -= ndy * overlap;
 
-            let gridX = Math.floor(particle.x * INVERSE_SPATIAL_CELL_SPACING);
-            let gridY = Math.floor(particle.y * INVERSE_SPATIAL_CELL_SPACING);
-
-            let minGridX = Math.max(0, gridX - 1);
-            let maxGridX = Math.min(SPATIAL_X_CELLS - 1, gridX + 1)
-            let minGridY = Math.max(0, gridY - 1);
-            let maxGridY = Math.min(SPATIAL_Y_CELLS - 1, gridY + 1)
-
-            for (let currentGridX = minGridX; currentGridX < maxGridX; currentGridX++) {
-                for (let currentGridY = minGridY; currentGridY < maxGridY; currentGridY++) {
-                    let currentGridIndex = currentGridX + currentGridY * SPATIAL_X_CELLS;
-
-                    let startIndex = partialSums[currentGridIndex];
-                    let endIndex = partialSums[currentGridIndex + 1];
-
-                    for (let j = startIndex; j < endIndex; j++) {
-                        let particleIndex = cellParticleIndices[j];
-
-                        // Skip the current particle.
-                        if (i === particleIndex) {
-                            continue;
-                        }
-
-                        let neighbour = particles[particleIndex];
-
-                        // Compute the displacement between the particles
-                        let dx = neighbour.x - particle.x;
-                        let dy = neighbour.y - particle.y;
-                        let distSq = dx * dx + dy * dy;
-
-                        if (distSq < minDistSquared && distSq > 0.0001) {
-                            let dist = Math.sqrt(distSq);
-
-                            // Normalized displacement vector
-                            let nx = dx / dist;
-                            let ny = dy / dist;
-
-                            // Overlap amount
-                            let overlap = 0.5 * (minDist - dist);
-
-                            // Push each particle away from each other
-                            particle.x -= nx * overlap;
-                            particle.y -= ny * overlap;
-
-                            neighbour.x += nx * overlap;
-                            neighbour.y += ny * overlap;
+                                positions[2 * neighbourParticleIndex] += ndx * overlap;
+                                positions[2 * neighbourParticleIndex + 1] += ndy * overlap;
+                            }
                         }
                     }
                 }
             }
         }
     }
-}
 
+    /**
+     * Clamps particles within the simulation bounds and zeroes their velocity on impact.
+     */
+    handleWallCollisions() {
+        let positions = this.particlePositions;
+        let velocities = this.particleVelocities;
 
+        // Simulation bounds (walls are one cell thick around the grid).
+        let minX = this.particleRadius + this.cellSize;
+        let maxX = this.width - this.particleRadius - this.cellSize;
+        let minY = this.particleRadius + this.cellSize;
+        let maxY = this.height - this.particleRadius - this.cellSize;
 
-/**
- * Sets the current type of each cell in the simulation grid (solid, fluid, or empty).
- */
-function markCellTypes() {
-    // Reset cell types and mark solid cells.
-    for (let i = 0; i < TOTAL_CELLS; i++) {
-        cellType[i] = solidCells[i] === 0 ? SOLID_CELL : EMPTY_CELL;
-    }
-
-    // Mark cells containing particles as fluid cells.
-    for (let particle of particles) {
-        let gridX = Math.floor(particle.x * INVERSE_CELL_SPACING);
-        let gridY = Math.floor(particle.y * INVERSE_CELL_SPACING);
-        let gridIndex = gridX + gridY * X_CELLS;
-
-        if (cellType[gridIndex] === EMPTY_CELL) {
-            cellType[gridIndex] = FLUID_CELL;
-        }
-    }
-}
-
-/**
- * Initializes the solidCells array to define which grid cells are solid (walls) and which are not.
- */
-function setupSolidCells() {
-    solidCells.fill(1, 0);
-
-    // Mark the outermost layer of cells as solid.
-    for (let gridX = 0; gridX < X_CELLS; gridX++) {
-        for (let gridY = 0; gridY < Y_CELLS; gridY++) {
-            if (gridX === 0 || gridY === 0 || gridX === X_CELLS - 1 || gridY === Y_CELLS - 1) {
-                solidCells[gridX + gridY * X_CELLS] = 0;
-            }
-        }
-    }
-}
-
-function solveIncompressibility(numberOfIterations, dt, overRelaxation) {
-    // Store a copy of the current velocity grids for FLIP.
-    uGridPrevious.set(uGrid);
-    vGridPrevious.set(vGrid);
-
-    for (let iteration = 0; iteration < numberOfIterations; iteration++) {
-
-        // Loop over simulation grid, ignoring the outermost layer of cells (as these are walls).
-        for (let gridX = 1; gridX < X_CELLS - 1; gridX++) {
-            for (let gridY = 1; gridY < Y_CELLS - 1; gridY++) {
-                let currentGridIndex = gridX + gridY * X_CELLS;
-
-                // Skip non-fluid cells.
-                if (cellType[currentGridIndex] !== FLUID_CELL) {
-                    continue;
-                }
-
-                // Get the array index of the current fluid cell.
-                let centre = currentGridIndex;
-
-                // Get the array indices of the surrounding cells.
-                let left = centre - 1;
-                let right = centre + 1;
-                let bottom = centre - X_CELLS;
-                let top = centre + X_CELLS;
-
-                // Get the solid status of the surrounding cells (0 = solid).
-                let leftSolid = solidCells[left];
-                let rightSolid = solidCells[right];
-                let bottomSolid = solidCells[bottom];
-                let topSolid = solidCells[top];
-
-                let surroundingSolid = leftSolid + rightSolid + bottomSolid + topSolid;
-
-                // Calculate divergence of the cell and apply over relaxation.
-                let divergence = uGrid[right] - uGrid[centre] + vGrid[top] - vGrid[centre];
-                divergence *= overRelaxation;
-
-                // Modify divergence based on particle density (reduce divergence in dense regions and vice versa).
-                if (restDensity > 0.0) {
-                    let k = STIFFNESS;  // Stiffness coefficient.
-                    let compression = densityGrid[currentGridIndex] - restDensity;
-                    if (compression > 0.0)
-                        divergence -= k * compression;
-                }
-
-                let divergenceCorrection = divergence / surroundingSolid;
-
-                // Update grid velocities to zero the current cells divergence.
-                uGrid[centre] += leftSolid * divergenceCorrection;
-                uGrid[right] -= rightSolid * divergenceCorrection;
-                vGrid[centre] += bottomSolid * divergenceCorrection;
-                vGrid[top] -= topSolid * divergenceCorrection;
-            }
-        }
-    }
-}
-
-function transferVelocitiesToParticles() {
-    for (let component of ['x', 'y']) {
-        let { dx, dy, grid } = getComponentData(component);
-
-        let prevF = component === 'x' ? uGridPrevious : vGridPrevious;  // FIX ME
-
-        for (let particle of particles) {
-            let { w1, w2, w3, w4, i1, i2, i3, i4 } = getWeightsAndIndices(particle, dx, dy);
-
-            // FIX ME
-            var offset = component === 'x' ? X_CELLS : 1;
-            var valid0 = cellType[i1] != EMPTY_CELL || cellType[i1 - offset] != EMPTY_CELL ? 1.0 : 0.0;
-            var valid1 = cellType[i2] != EMPTY_CELL || cellType[i2 - offset] != EMPTY_CELL ? 1.0 : 0.0;
-            var valid2 = cellType[i3] != EMPTY_CELL || cellType[i3 - offset] != EMPTY_CELL ? 1.0 : 0.0;
-            var valid3 = cellType[i4] != EMPTY_CELL || cellType[i4 - offset] != EMPTY_CELL ? 1.0 : 0.0;
-
-            var d = valid0 * w1 + valid1 * w2 + valid2 * w3 + valid3 * w4;
-
-            var v = component === 'x' ? particle.vx : particle.vy;
-
-            if (d > 0.0) {
-                var picV = (valid0 * w1 * grid[i1] + valid1 * w2 * grid[i2] + valid2 * w3 * grid[i3] + valid3 * w4 * grid[i4]) / d;
-                var corr = (valid0 * w1 * (grid[i1] - prevF[i1]) + valid1 * w2 * (grid[i2] - prevF[i2])
-								+ valid2 * w3 * (grid[i3] - prevF[i3]) + valid3 * w4 * (grid[i4] - prevF[i4])) / d;
-				var flipV = v + corr;
-
-                if (component === 'x') {
-                    particle.vx = (1.0 - FLIP_RATIO) * picV + FLIP_RATIO * flipV;
-                } else {
-                    particle.vy = (1.0 - FLIP_RATIO) * picV + FLIP_RATIO * flipV;
-                }
-            }
-            // END FIX ME
-        }
-    }
-}
-
-function transferVelocitiesToGrid() {
-    // Reset velocities and weights.
-    uGrid.fill(0, 0);
-    vGrid.fill(0, 0);
-    uGridWeights.fill(0, 0);
-    vGridWeights.fill(0, 0);
-
-    markCellTypes();
-
-    for (let component of ['x', 'y']) {
-        let { dx, dy, grid } = getComponentData(component);
-
-        let gridWeights = component === 'x' ? uGridWeights : vGridWeights;
-
-        for (let particle of particles) {
-            let { w1, w2, w3, w4, i1, i2, i3, i4 } = getWeightsAndIndices(particle, dx, dy);
+        for (let i = 0; i < this.particleCount; i++) {
+            let xi = 2 * i;
+            let yi = 2 * i + 1;
             
-            let particleVelocity = component === 'x' ? particle.vx : particle.vy;
+            // Collision with left wall.
+            if (positions[xi] < minX) {
+                positions[xi] = minX;
+                velocities[xi] = 0;
+            }
 
-            // Update the sum of weighted grid velocities at the four corners of the grid cell.
-            grid[i1] += w1 * particleVelocity;
-            grid[i2] += w2 * particleVelocity;
-            grid[i3] += w3 * particleVelocity;
-            grid[i4] += w4 * particleVelocity;
+            // Collision with right wall.
+            if (positions[xi] > maxX) {
+                positions[xi] = maxX;
+                velocities[xi] = 0;
+            }
 
-            // Update the sum of grid weights at the four corners of the grid cell.
-            gridWeights[i1] += w1;
-            gridWeights[i2] += w2;
-            gridWeights[i3] += w3;
-            gridWeights[i4] += w4;
-        }
+            // Collision with bottom wall.
+            if (positions[yi] < minY) {
+                positions[yi] = minY;
+                velocities[yi] = 0;
+            }
 
-        for (let i = 0; i < TOTAL_VERTICES; i++) {
-            if (gridWeights[i] > 0) {
-                // Normalise the sum of weighted grid velocities by the sum of weights at each grid cell.
-                grid[i] /= gridWeights[i];
+            // Collision with top wall.
+            if (positions[yi] > maxY) {
+                positions[yi] = maxY; 
+                velocities[yi] = 0;
             }
         }
     }
-}
 
-function getComponentData(component) {
-    return {
-        dx: component === 'x' ? 0 : HALF_CELL_SPACING,
-        dy: component === 'x' ? HALF_CELL_SPACING : 0,
-        grid: component === 'x' ? uGrid : vGrid
-    }
-}
+    /**
+     * Transfers particle velocities to the staggered MAC grid by using bilinear interpolation to sum each 
+     * particle's weighted velocity to surrounding grid points and normalising by the sum of weights.
+     */
+    transferVelocitiesToGrid() {
+        let positions = this.particlePositions;
+        let velocities = this.particleVelocities;
+        let cellSize = this.cellSize;
+        let inverseCellSize = this.inverseCellSize;
+        let cellCountX = this.cellCountX
+        
+        // Reset grid data.
+        this.uGrid.fill(0.0);
+        this.vGrid.fill(0.0);
+        this.uGridWeights.fill(0.0);
+        this.vGridWeights.fill(0.0);
 
-function getWeightsAndIndices(particle, dx, dy) {
-    // Transform particle position into the given velocity grid’s coordinate system.
-    let x = particle.x - dx;
-    let y = particle.y - dy;
+        this.markCellTypes();
 
-    // Find the grid cell axis indices for the cell containing the current particle.
-    let gridX = Math.floor(x * INVERSE_CELL_SPACING);
-    let gridY = Math.floor(y * INVERSE_CELL_SPACING);
+        // 0 = x-component (uGrid), 1 = y-component (vGrid).
+        for (let component = 0; component < 2; component++) {
+            let dx = component === 0 ? 0 : this.halfCellSize;
+            let dy = component === 0 ? this.halfCellSize : 0;
+            let velocityGrid = component === 0 ? this.uGrid : this.vGrid;
+            let velocityGridWeights = component === 0 ? this.uGridWeights : this.vGridWeights;
 
-    // Remainders of the particle's position in the grid cell.
-    let deltaX = x - gridX * CELL_SPACING;
-    let deltaY = y - gridY * CELL_SPACING;
+            for (let i = 0; i < this.particleCount; i++) {
+                let xi = 2 * i;
+                let yi = 2 * i + 1;
 
-    // Bilinear interpolation weights and array indices (w1/i1 = bottom-left corner, counter-clockwise).
-    return {
-        w1: (1 - deltaX * INVERSE_CELL_SPACING) * (1 - deltaY * INVERSE_CELL_SPACING),
-        w2: deltaX * INVERSE_CELL_SPACING * (1 - deltaY * INVERSE_CELL_SPACING),
-        w3: (deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING),
-        w4: (1 - deltaX * INVERSE_CELL_SPACING) * (deltaY * INVERSE_CELL_SPACING),
+                // Particle position in this component's grid coordinate system.
+                let x = positions[xi] - dx;
+                let y = positions[yi] - dy;
 
-        i1: gridX + gridY * X_VERTICES,
-        i2: (gridX + 1) + gridY * X_VERTICES,
-        i3: (gridX + 1) + (gridY + 1) * X_VERTICES,
-        i4: gridX + (gridY + 1) * X_VERTICES
-    }
-}
+                // Cell position containing the current particle.
+                let gridX = Math.floor(x * inverseCellSize);
+                let gridY = Math.floor(y * inverseCellSize);
 
+                // Local position within the cell.
+                let deltaX = x - gridX * cellSize;
+                let deltaY = y - gridY * cellSize;
 
-/**
- * Detects and resolves collisions between particles and walls in the simulation 
- * by clamping positions to stay within bounds and zeroing velocity along the 
- * collision axis. Note that the outermost layer of grid cells in the simulation
- * are the walls considered here.
- */
-function handleWallCollisions() {
-    for (let particle of particles) {
-        // Define the simulation bounds.
-        let minX = PARTICLE_RADIUS + CELL_SPACING;
-        let maxX = CANVAS_WIDTH - PARTICLE_RADIUS - CELL_SPACING;
-        let minY = PARTICLE_RADIUS + CELL_SPACING;
-        let maxY = CANVAS_HEIGHT - PARTICLE_RADIUS - CELL_SPACING;
+                // Bilinear interpolation weights and their corresponding array indices 
+                // (w1/i1 = bottom-left corner, increasing counter-clockwise).
+                let w1 = (1 - deltaX * inverseCellSize) * (1 - deltaY * inverseCellSize);
+                let w2 = deltaX * inverseCellSize * (1 - deltaY * inverseCellSize);
+                let w3 = (deltaX * inverseCellSize) * (deltaY * inverseCellSize);
+                let w4 = (1 - deltaX * inverseCellSize) * (deltaY * inverseCellSize);
 
-        // Collision with left wall.
-        if (particle.x < minX) {
-            particle.x = minX
-            particle.vx = 0;
-        }
+                let i1 = gridX + gridY * cellCountX;
+                let i2 = (gridX + 1) + gridY * cellCountX;
+                let i3 = (gridX + 1) + (gridY + 1) * cellCountX;
+                let i4 = gridX + (gridY + 1) * cellCountX;
+                
+                // Particle velocity for this axis.
+                let v = velocities[xi + component];
 
-        // Collision with right wall.
-        if (particle.x > maxX) {
-            particle.x = maxX;
-            particle.vx = 0;
-        }
+                // Accumulate weighted velocity and weights.
+                velocityGrid[i1] += w1 * v;    
+                velocityGrid[i2] += w2 * v;    
+                velocityGrid[i3] += w3 * v;    
+                velocityGrid[i4] += w4 * v; 
+                
+                velocityGridWeights[i1] += w1;
+                velocityGridWeights[i2] += w2;
+                velocityGridWeights[i3] += w3;
+                velocityGridWeights[i4] += w4;
+            }
 
-        // Collision with bottom wall.
-        if (particle.y < minY) {
-            particle.y = minY;
-            particle.vy = 0;
-        }
-
-        // Collision with top wall.
-        if (particle.y > maxY) {
-            particle.y = maxY; 
-            particle.vy = 0;
-        }
-    }
-}
-
-/**
- * Updates particle positions and velocities using Euler integration.
- *
- * @param {number} dt - Time step for integration.
- * @param {number} gravity - Vertical acceleration due to gravity.
- */
-function integrateParticles(dt, gravity) {
-    for (let particle of particles) {
-        // Apply gravity.
-        particle.vy += gravity * dt;
-
-        // Update particle position based on velocity.
-        particle.x += particle.vx * dt;
-        particle.y += particle.vy * dt;
-    }
-}
-
-/**
- * Initialises the particle array by placing particles in a staggered grid
- * on the lower-left half of the canvas. 
- */
-function createParticles() {
-    const spacing = 2 * PARTICLE_RADIUS * 1.1;
-    const particlesPerRow = Math.floor(0.5 * CANVAS_WIDTH / spacing);
-    const rows = Math.ceil(NUMBER_OF_PARTICLES / particlesPerRow);
-
-    let count = 0;
-    for (let row = 0; row < rows; row++) {
-        const xOffset = (row % 2 === 0) ? 0 : spacing * 0.5;
-        for (let col = 0; col < particlesPerRow; col++) {
-            if (count >= NUMBER_OF_PARTICLES) break;
-            const x = col * spacing + PARTICLE_RADIUS + CELL_SPACING + xOffset;
-            const y = row * spacing + PARTICLE_RADIUS + CELL_SPACING;
-            const vx = 0.0;
-            const vy = 0.0;
-            const color = [0.0, 0.0, 1.0, 1];
-            particles.push(new Particle(x, y, vx, vy, color));
-            count++;
+            // Normalize velocities at each grid vertex.
+            for (let i = 0; i < this.cellCount; i++) {
+                if (velocityGridWeights[i] > 0) {
+                    velocityGrid[i] /= velocityGridWeights[i];
+                }
+            }
         }
     }
-}
 
-/**
- * Packs each particle's position (x, y) and color (r, g, b, a) into a Float32Array.
- *
- * @returns {Float32Array} Flat buffer of particle data.
- */
-function particlesToBuffer() {
-    let bufferData = new Float32Array(NUMBER_OF_PARTICLES * 6);
-    for (let i = 0; i < NUMBER_OF_PARTICLES; i++) {
-        let particle = particles[i];
-        let particlePositionNDC = simulationCoordinatesToNDC(particle.x, particle.y);
+    /**
+     * Sets the current type of each cell in the simulation grid.
+     */
+    markCellTypes() {
+        let positions = this.particlePositions;
+        let inverseCellSize = this.inverseCellSize;
+        let cellCountX = this.cellCountX
+        let cellType = this.cellType;
+        let solidCells = this.solidCells;
 
-        bufferData[i * 6] = particlePositionNDC.x;
-        bufferData[i * 6 + 1] = particlePositionNDC.y;
-        bufferData[i * 6 + 2] = particle.color[0];
-        bufferData[i * 6 + 3] = particle.color[1];
-        bufferData[i * 6 + 4] = particle.color[2];
-        bufferData[i * 6 + 5] = particle.color[3];
+        // Reset cell types and mark solid cells.
+        for (let i = 0; i < this.cellCount; i++) {
+            cellType[i] = solidCells[i] === 0 ? SOLID_CELL : EMPTY_CELL;
+        }
+
+        // Mark cells containing particles as fluid cells.
+        for (let i = 0; i < this.particleCount; i++) {
+            let xi = 2 * i;
+            let yi = 2 * i + 1;
+
+            let gridX = Math.floor(positions[xi] * inverseCellSize);
+            let gridY = Math.floor(positions[yi] * inverseCellSize);
+            let gridIndex = gridX + gridY * cellCountX;
+
+            if (cellType[gridIndex] === EMPTY_CELL) {
+                cellType[gridIndex] = FLUID_CELL;
+            }
+        }
     }
-    return bufferData;
+
+    /**
+     * Transfers velocities from the MAC grid back to particles using bilinear interpolation.
+     * Blends PIC and FLIP velocities based on the given flipRatio to update particle velocities.
+     *
+     * @param {number} flipRatio - Blending factor between PIC (0.0) and FLIP (1.0) velocity updates.
+     */
+    transferVelocitiesToParticles(flipRatio) {
+        let positions = this.particlePositions;
+        let velocities = this.particleVelocities;
+        let cellSize = this.cellSize;
+        let inverseCellSize = this.inverseCellSize;
+        let cellCountX = this.cellCountX;
+        let cellType = this.cellType;
+
+        for (let component = 0; component < 2; component++) {
+            let dx = component === 0 ? 0 : this.halfCellSize;
+            let dy = component === 0 ? this.halfCellSize : 0;
+            let velocityGrid = component === 0 ? this.uGrid : this.vGrid;
+            let velocityGridPrevious = component === 0 ? this.uGridPrevious : this.vGridPrevious;
+
+            for (let i = 0; i < this.particleCount; i++) {
+                let xi = 2 * i;
+                let yi = 2 * i + 1;
+
+                let x = positions[xi] - dx;
+                let y = positions[yi] - dy;
+
+                let gridX = Math.floor(x * inverseCellSize);
+                let gridY = Math.floor(y * inverseCellSize);
+
+                let deltaX = x - gridX * cellSize;
+                let deltaY = y - gridY * cellSize;
+
+                let w1 = (1 - deltaX * inverseCellSize) * (1 - deltaY * inverseCellSize);
+                let w2 = deltaX * inverseCellSize * (1 - deltaY * inverseCellSize);
+                let w3 = (deltaX * inverseCellSize) * (deltaY * inverseCellSize);
+                let w4 = (1 - deltaX * inverseCellSize) * (deltaY * inverseCellSize);
+
+                let i1 = gridX + gridY * cellCountX;
+                let i2 = (gridX + 1) + gridY * cellCountX;
+                let i3 = (gridX + 1) + (gridY + 1) * cellCountX;
+                let i4 = gridX + (gridY + 1) * cellCountX;
+
+                let v = velocities[xi + component];
+
+                // Validate each weight based on whether the face it's stored at is adjacent to a fluid cell.
+                let offset = component === 0 ? 1 : cellCountX;
+                let w1Valid = cellType[i1] === FLUID_CELL || cellType[i1 - offset] === FLUID_CELL ? w1 : 0.0;
+                let w2Valid = cellType[i2] === FLUID_CELL || cellType[i2 - offset] === FLUID_CELL ? w2 : 0.0;
+                let w3Valid = cellType[i3] === FLUID_CELL || cellType[i3 - offset] === FLUID_CELL ? w3 : 0.0;
+                let w4Valid = cellType[i4] === FLUID_CELL || cellType[i4 - offset] === FLUID_CELL ? w4 : 0.0;
+
+                let weightSum = w1Valid + w2Valid + w3Valid + w4Valid;
+                if (weightSum > 0.0) {
+                    let weightedVelocitySum = w1Valid * velocityGrid[i1] + w2Valid * velocityGrid[i2] + w3Valid * velocityGrid[i3] + w4Valid * velocityGrid[i4];
+                    let weightedDeltaSum = 
+                        w1Valid * (velocityGrid[i1] - velocityGridPrevious[i1]) + 
+                        w2Valid * (velocityGrid[i2] - velocityGridPrevious[i2]) + 
+                        w3Valid * (velocityGrid[i3] - velocityGridPrevious[i3]) + 
+                        w4Valid * (velocityGrid[i4] - velocityGridPrevious[i4]);
+
+                    let picVelocity = weightedVelocitySum / weightSum;
+                    let flipVelocity = v + (weightedDeltaSum / weightSum);
+
+                    velocities[xi + component] = (1.0 - flipRatio) * picVelocity + flipRatio * flipVelocity;
+
+                }
+                
+            }
+        }
+    }
+
+    /**
+     * Iteratively adjusts grid velocities to enforce fluid incompressibility by zeroing divergence.
+     * Applies over-relaxation and compensates for velocity drift by reducing divergence in dense regions.
+     *
+     * @param {number} numberOfIterations - Number of solver iterations to perform.
+     * @param {number} overRelaxation - Factor to accelerate convergence of grid incompressibility.
+     * @param {number} stiffnessConstant - Strength of density-based divergence correction.
+     */
+    solveIncompressibility(numberOfIterations, overRelaxation, stiffnessConstant) {
+        let cellCountX = this.cellCountX;
+        let cellCountY = this.cellCountY;
+        let restDensity = this.restDensity;
+        let densityGrid = this.densityGrid;
+        let uGrid = this.uGrid;
+        let vGrid = this.vGrid;
+        let cellType = this.cellType;
+        let solidCells = this.solidCells;
+
+        // Store a copy of the current velocity grids for FLIP.
+        this.uGridPrevious.set(uGrid);
+        this.vGridPrevious.set(vGrid);
+
+        for (let iteration = 0; iteration < numberOfIterations; iteration++) {
+
+            // Loop over simulation grid, ignoring the outermost layer of cells (as these are walls).
+            for (let gridX = 1; gridX < cellCountX - 1; gridX++) {
+                for (let gridY = 1; gridY < cellCountY - 1; gridY++) {
+                    let gridIndex = gridX + gridY * cellCountX;
+
+                    // Skip non-fluid cells.
+                    if (cellType[gridIndex] !== FLUID_CELL) continue;
+
+                    // Get the array index of the current fluid cell.
+                    let centre = gridIndex;
+
+                    // Get the array indices of the surrounding cells.
+                    let left = centre - 1;
+                    let right = centre + 1;
+                    let bottom = centre - cellCountX;
+                    let top = centre + cellCountX;
+
+                    // Get the solid status of the surrounding cells (0 = solid).
+                    let leftSolid = solidCells[left];
+                    let rightSolid = solidCells[right];
+                    let bottomSolid = solidCells[bottom];
+                    let topSolid = solidCells[top];
+
+                    let surroundingSolid = leftSolid + rightSolid + bottomSolid + topSolid;
+
+                    // Calculate divergence of the cell and apply over relaxation.
+                    let divergence = uGrid[right] - uGrid[centre] + vGrid[top] - vGrid[centre];
+                    divergence *= overRelaxation;
+
+                    // Modify divergence based on particle density (reduce divergence in dense regions and vice versa).
+                    if (restDensity > 0.0) {
+                        let compression = densityGrid[gridIndex] - restDensity;
+                        if (compression > 0.0) {
+                            divergence -= stiffnessConstant * compression;
+                        }       
+                    }
+
+                    let divergenceCorrection = divergence / surroundingSolid;
+
+                    // Update grid velocities to zero the current cells divergence.
+                    uGrid[centre] += leftSolid * divergenceCorrection;
+                    uGrid[right] -= rightSolid * divergenceCorrection;
+                    vGrid[centre] += bottomSolid * divergenceCorrection;
+                    vGrid[top] -= topSolid * divergenceCorrection;
+                }
+            }
+        }
+    }
+
+    updateDensityGrid() {
+        let positions = this.particlePositions;
+        let cellSize = this.cellSize;
+        let inverseCellSize = this.inverseCellSize;
+        let cellCountX = this.cellCountX;
+        let densityGrid = this.densityGrid;
+        let cellType = this.cellType;
+        
+        densityGrid.fill(0.0);
+
+        let dx = this.halfCellSize;
+        let dy = this.halfCellSize;
+
+        // Particles contribute to the 4 nearest cell centres using bilinear weights,
+        // producing a smooth estimate of particle density per grid cell.
+        for (let i = 0; i < this.particleCount; i++) {
+            let xi = 2 * i;
+            let yi = 2 * i + 1;
+
+            let x = positions[xi] - dx;
+            let y = positions[yi] - dy;
+
+            let gridX = Math.floor(x * inverseCellSize);
+            let gridY = Math.floor(y * inverseCellSize);
+
+            let deltaX = x - gridX * cellSize;
+            let deltaY = y - gridY * cellSize;
+
+            let w1 = (1 - deltaX * inverseCellSize) * (1 - deltaY * inverseCellSize);
+            let w2 = deltaX * inverseCellSize * (1 - deltaY * inverseCellSize);
+            let w3 = (deltaX * inverseCellSize) * (deltaY * inverseCellSize);
+            let w4 = (1 - deltaX * inverseCellSize) * (deltaY * inverseCellSize);
+
+            let i1 = gridX + gridY * cellCountX;
+            let i2 = (gridX + 1) + gridY * cellCountX;
+            let i3 = (gridX + 1) + (gridY + 1) * cellCountX;
+            let i4 = gridX + (gridY + 1) * cellCountX;
+
+            if (!this.isBorderCell(i1)) densityGrid[i1] += w1;
+            if (!this.isBorderCell(i2)) densityGrid[i2] += w2;
+            if (!this.isBorderCell(i3)) densityGrid[i3] += w3;
+            if (!this.isBorderCell(i4)) densityGrid[i4] += w4;
+        }
+
+        // If unset, calculate rest density as the average density per fluid cell.
+        if (this.restDensity === 0.0) {
+            let densitySum = 0.0;
+            let fluidCellCount = 0;
+
+            for (let i = 0; i < this.cellCount; i++) {
+                if (cellType[i] === FLUID_CELL) {
+                    densitySum += densityGrid[i];
+                    fluidCellCount++;
+                }
+            }
+
+            if (fluidCellCount > 0) {
+                this.restDensity = densitySum / fluidCellCount;
+            }
+        }
+    }
+
+    isBorderCell(index) {
+        let x = index % (this.cellCountX);
+        let y = Math.floor(index / this.cellCountX);
+
+        return x === 0 || x === this.cellCountX - 1 || y === 0 || y === this.cellCountY - 1;
+    }
+
+    particlePositionsNDC() {
+        let positions = this.particlePositions;
+        let width = this.width;
+        let height = this.height;
+
+        let particlePositionsNDC = new Float32Array(2 * this.particleCount);
+        for (let i = 0; i < this.particleCount; i++) {
+            let xi = 2 * i;
+            let yi = 2 * i + 1;
+
+            particlePositionsNDC[xi] = (positions[xi] / width) * 2 - 1;
+            particlePositionsNDC[yi] = (positions[yi] / height) * 2 - 1;
+        }
+
+        return particlePositionsNDC;
+    }
+
+    stepSimulation(dt, gravity, flipRatio, overRelaxation, particleSeparationIterations, projectionIterations, stiffnessConstant) {
+        let subSteps = 1;
+        let sdt = dt / subSteps;
+
+        for (let step = 0; step < subSteps; step++) {
+            this.integrateParticles(sdt, gravity);
+            this.separateParticles(particleSeparationIterations);
+            this.handleWallCollisions();
+            this.transferVelocitiesToGrid();
+            this.markCellTypes();
+            this.updateDensityGrid();
+            this.solveIncompressibility(projectionIterations, overRelaxation, stiffnessConstant);
+            this.transferVelocitiesToParticles(flipRatio);
+        }
+    }
 }
 
-/**
- * Converts simulation coordinates (origin bottom-left) to Normalised Device Coordinates 
- * (NDC), where the origin is the centre of the screen and axes range from -1 to 1.
- *
- * @param {number} x - X coordinate in simulation space.
- * @param {number} y - Y coordinate in simulation space.
- * @returns {{x: number, y: number}} An object containing x and y in NDC space.
- */
-function simulationCoordinatesToNDC(x, y) {
-    return {
-        x: (x / CANVAS_WIDTH) * 2 - 1,
-        y: (y / CANVAS_HEIGHT) * 2 - 1
-    };
+
+
+
+
+
+
+let scene = 
+{   
+    // Tank.
+    tankWidth: window.innerWidth - 200,
+    tankHeight: window.innerHeight - 100,
+    resolution: 80,
+
+    // Fluid initialisation.
+    relativeFluidWidth: 0.6,
+    relativeFluidHeight: 0.7,
+
+    // Simulation.
+    gravity: -500,
+    dt: 1.0 / 60.0,
+    flipRatio: 0.95,
+    projectionIterations: 60,
+    particleSeparationIterations: 2,
+    overRelaxation: 1.9,
+    stiffnessConstant: 500.0,
+
+    flipFluidSimulation: null
+};
+
+function initialiseScene() {
+    let cellSize = scene.tankHeight / scene.resolution;
+    let cellCountX = Math.ceil(scene.tankWidth / cellSize)
+    let cellCountY = scene.resolution;
+    
+    let particleRadius = 0.3 * cellSize;
+
+    let particleSpacingX = 2 * particleRadius;
+    let particleSpacingY = Math.sqrt(3) * particleRadius;
+
+    let simulationWidth = cellCountX * cellSize;
+    let simulationHeight = cellCountY * cellSize;
+
+    let particleCountX = Math.floor((scene.relativeFluidWidth * simulationWidth - 2.0 * cellSize - 2.0 * particleRadius) / particleSpacingX);
+	let particleCountY = Math.floor((scene.relativeFluidHeight * simulationHeight - 2.0 * cellSize - 2.0 * particleRadius) / particleSpacingY);
+	let particleCount = particleCountX * particleCountY;
+    
+    let f = scene.flipFluidSimulation = new FlipFluidSimulation(particleCount, particleRadius, cellCountX, cellCountY, cellSize);
+
+    // Initialise particles.
+    let i = 0;
+    for (let px = 0; px < particleCountX; px++) {
+        for (let py = 0; py < particleCountY; py++) {
+            let xi = 2 * i;
+            let yi = 2 * i + 1;
+
+            let offset = py % 2 === 0 ? 0 : particleRadius;
+            f.particlePositions[xi] = cellSize + particleRadius + px * particleSpacingX + offset;
+            f.particlePositions[yi] = cellSize + particleRadius + py * particleSpacingY;
+
+            i++;
+        }
+    }
+
+    // Initialise particle colours.
+    for (let i = 0; i < particleCount; i++) {
+        let ri = i * 3;
+        let gi = i * 3 + 1;
+        let bi = i * 3 + 2;
+
+        f.particleColours[ri] = 0.0;
+        f.particleColours[gi] = 0.0;
+        f.particleColours[bi] = 1.0;
+    }
+
+    // Initialise solid cell mask.
+    for (let gridX = 0; gridX < cellCountX; gridX++) {
+        for (let gridY = 0; gridY < cellCountY; gridY++) {
+            if (gridX === 0 || gridY === 0 || gridX === cellCountX - 1 || gridY === cellCountY - 1) {
+                f.solidCells[gridX + gridY * cellCountX] = 0.0;  // Solid.
+            } else {
+                f.solidCells[gridX + gridY * cellCountX] = 1.0;  // Not solid.
+            }
+        }  
+    }
 }
 
 
@@ -538,33 +656,31 @@ function simulationCoordinatesToNDC(x, y) {
 
 
 
+initialiseScene();
 
 
 
-const vertexShaderSource = `#version 300 es
+
+
+
+let vertexShaderSource = `#version 300 es
 precision mediump float;
 
 uniform float uPointSize;
 in vec2 aPosition;
-in vec4 aColor;
-
-out vec4 vColor;
 
 void main() {
-    vColor = aColor;
-    gl_PointSize = uPointSize;
     gl_Position = vec4(aPosition, 0.0, 1.0);
+    gl_PointSize = uPointSize;
 }`;
 
-const fragmentShaderSource = `#version 300 es
+let fragmentShaderSource = `#version 300 es
 precision mediump float;
-
-in vec4 vColor;
 
 out vec4 fragColor;
 
 void main() {
-    fragColor = vec4(vColor);
+    fragColor = vec4(0.0, 0.0, 1.0, 1.0);
 
     // Convert square point into a circle
     vec2 circleCoord = 2.0 * gl_PointCoord - 1.0;
@@ -573,70 +689,72 @@ void main() {
     }
 }`;
 
-const canvas = document.getElementById('canvas');
-canvas.width = CANVAS_WIDTH;
-canvas.height = CANVAS_HEIGHT;
-const gl = canvas.getContext('webgl2');
 
-const program = gl.createProgram();
 
-const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+let canvas = document.getElementById('canvas');
+canvas.width = scene.flipFluidSimulation.width;
+canvas.height = scene.flipFluidSimulation.height;
+let gl = canvas.getContext('webgl2');
+
+
+
+let program = gl.createProgram();
+
+
+
+let vertexShader = gl.createShader(gl.VERTEX_SHADER);
 gl.shaderSource(vertexShader, vertexShaderSource);
 gl.compileShader(vertexShader);
 gl.attachShader(program, vertexShader);
 
-const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 gl.shaderSource(fragmentShader, fragmentShaderSource);
 gl.compileShader(fragmentShader);
 gl.attachShader(program, fragmentShader);
+
+
 
 gl.linkProgram(program);
 
 gl.useProgram(program);
 
-createParticles();  // Create particles
-setupSolidCells();  // Setup solid cells
-const particlesBufferData = particlesToBuffer();
 
-const uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
-gl.uniform1f(uPointSizeLocation, 2 * PARTICLE_RADIUS);
 
-const aPositionLocation = gl.getAttribLocation(program, 'aPosition');
-const aColorLocation = gl.getAttribLocation(program, 'aColor');
+// Uniforms.
+let particleDiameter = 2.0 * scene.flipFluidSimulation.particleRadius;
+let uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
+gl.uniform1f(uPointSizeLocation, particleDiameter);
 
+// Attributes.
+let aPositionLocation = gl.getAttribLocation(program, 'aPosition');
 gl.enableVertexAttribArray(aPositionLocation);
-gl.enableVertexAttribArray(aColorLocation);
-
-const particlesBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, particlesBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, particlesBufferData, gl.DYNAMIC_DRAW);
-
-// Each particle has 6 components. The first two are the particle's position (x, y),
-// the next four are the particle's RGBA color (r, g, b, a). Each component is a 32 
-// bit float, thus 6 * 4 = 24 bytes per particle (recall 8 bits = 1 byte).
-gl.vertexAttribPointer(aPositionLocation, 2, gl.FLOAT, false, 6 * 4, 0);
-gl.vertexAttribPointer(aColorLocation, 4, gl.FLOAT, false, 6 * 4, 2 * 4);
 
 
+
+
+let particlePositionsBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
+gl.vertexAttribPointer(aPositionLocation, 2, gl.FLOAT, false, 2 * 4, 0);
 
 
 function animate() {
-    integrateParticles(dt, GRAVITY);
-    separateParticles(2);
-    handleWallCollisions();
-    transferVelocitiesToGrid();
-    updateDensityGrid();
-    console.log(densityGrid);
-    solveIncompressibility(numberOfDivergenceIterations, dt, overRelaxation);
-    transferVelocitiesToParticles();
+    scene.flipFluidSimulation.stepSimulation(
+        scene.dt, 
+        scene.gravity, 
+        scene.flipRatio, 
+        scene.overRelaxation, 
+        scene.particleSeparationIterations, 
+        scene.projectionIterations, 
+        scene.stiffnessConstant
+    )
 
-    const bufferData = particlesToBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, particlesBuffer);
+    let bufferData = scene.flipFluidSimulation.particlePositionsNDC();
+    gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, bufferData, gl.DYNAMIC_DRAW);
 
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.drawArrays(gl.POINTS, 0, particles.length);
+    gl.drawArrays(gl.POINTS, 0, scene.flipFluidSimulation.particleCount);
 
     requestAnimationFrame(animate);
 }
