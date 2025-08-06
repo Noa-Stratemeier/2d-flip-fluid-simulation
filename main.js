@@ -65,6 +65,12 @@ class FlipFluidSimulation {
         }
     }
 
+    /**
+     * Resolves particle overlaps by iteratively separating nearby overlapping pairs.
+     * Uses a spatial hash grid to check overlaps with neighbours in a 3×3 cell region.
+     *
+     * @param {number} numberOfIterations - Number of separation iterations to perform.
+     */
     separateParticles(numberOfIterations) {
         let inverseSpatialCellSize = this.inverseSpatialCellSize;
         let spatialCellCountX = this.spatialCellCountX;
@@ -127,7 +133,7 @@ class FlipFluidSimulation {
                 let maxGridX = Math.min(spatialCellCountX - 1, gridX + 1)
                 let minGridY = Math.max(0, gridY - 1);
                 let maxGridY = Math.min(spatialCellCountY - 1, gridY + 1)
-
+                
                 for (let gridX = minGridX; gridX <= maxGridX; gridX++) {
                     for (let gridY = minGridY; gridY <= maxGridY; gridY++) {
                         let gridIndex = gridX + gridY * spatialCellCountX;
@@ -136,15 +142,19 @@ class FlipFluidSimulation {
                         let endIndex = partialSums[gridIndex + 1];
 
                         for (let j = startIndex; j < endIndex; j++) {
-                            let neighbourParticleIndex = cellParticleIndices[j];
+                            let iNeighbour = cellParticleIndices[j];
 
-                            // Skip the current particle.
-                            if (i === neighbourParticleIndex) continue;
+                            let xiNeighbour = 2 * iNeighbour;
+                            let yiNeighbour = 2 * iNeighbour + 1;
 
-                            let dx = positions[2 * neighbourParticleIndex] - positions[2 * i];
-                            let dy = positions[2 * neighbourParticleIndex + 1] - positions[2 * i + 1];
+                            // Skip self-collision: don't resolve collisions between the particle and itself.
+                            if (i === iNeighbour) continue;
+
+                            let dx = positions[xiNeighbour] - positions[xi];
+                            let dy = positions[yiNeighbour] - positions[yi];
                             let distanceSquared = dx * dx + dy * dy;
 
+                            // If particles overlap, push them apart.
                             if (distanceSquared < minDistanceSquared && distanceSquared != 0.0) {
                                 let distance = Math.sqrt(distanceSquared);
 
@@ -153,11 +163,11 @@ class FlipFluidSimulation {
 
                                 let overlap = 0.5 * (minDistance - distance);
 
-                                positions[2 * i] -= ndx * overlap;
-                                positions[2 * i + 1] -= ndy * overlap;
+                                positions[xi] -= ndx * overlap;
+                                positions[yi] -= ndy * overlap;
 
-                                positions[2 * neighbourParticleIndex] += ndx * overlap;
-                                positions[2 * neighbourParticleIndex + 1] += ndy * overlap;
+                                positions[xiNeighbour] += ndx * overlap;
+                                positions[yiNeighbour] += ndy * overlap;
                             }
                         }
                     }
@@ -173,7 +183,7 @@ class FlipFluidSimulation {
         let positions = this.particlePositions;
         let velocities = this.particleVelocities;
 
-        // Simulation bounds (walls are one cell thick around the grid).
+        // Simulation bounds (outermost layer of grid cells are walls).
         let minX = this.particleRadius + this.cellSize;
         let maxX = this.width - this.particleRadius - this.cellSize;
         let minY = this.particleRadius + this.cellSize;
@@ -278,7 +288,7 @@ class FlipFluidSimulation {
                 velocityGridWeights[i4] += w4;
             }
 
-            // Normalize velocities at each grid vertex.
+            // Normalise velocities at each grid vertex.
             for (let i = 0; i < this.cellCount; i++) {
                 if (velocityGridWeights[i] > 0) {
                     velocityGrid[i] /= velocityGridWeights[i];
@@ -442,7 +452,7 @@ class FlipFluidSimulation {
                     let divergence = uGrid[right] - uGrid[centre] + vGrid[top] - vGrid[centre];
                     divergence *= overRelaxation;
 
-                    // Modify divergence based on particle density (reduce divergence in dense regions and vice versa).
+                    // Reduce divergence in dense regions to compensate for velocity drift.
                     if (restDensity > 0.0) {
                         let compression = densityGrid[gridIndex] - restDensity;
                         if (compression > 0.0) {
@@ -462,6 +472,11 @@ class FlipFluidSimulation {
         }
     }
 
+    /**
+     * Computes a smoothed particle density per grid cell using bilinear weighting.
+     * Each particle contributes to its 4 nearest non-solid cells. If rest density
+     * is unset, it's initialised as the average density of all fluid cells.
+     */
     updateDensityGrid() {
         let positions = this.particlePositions;
         let cellSize = this.cellSize;
@@ -500,10 +515,10 @@ class FlipFluidSimulation {
             let i3 = (gridX + 1) + (gridY + 1) * cellCountX;
             let i4 = gridX + (gridY + 1) * cellCountX;
 
-            if (!this.isBorderCell(i1)) densityGrid[i1] += w1;
-            if (!this.isBorderCell(i2)) densityGrid[i2] += w2;
-            if (!this.isBorderCell(i3)) densityGrid[i3] += w3;
-            if (!this.isBorderCell(i4)) densityGrid[i4] += w4;
+            if (cellType[i1] !== SOLID_CELL) densityGrid[i1] += w1;
+            if (cellType[i2] !== SOLID_CELL) densityGrid[i2] += w2;
+            if (cellType[i3] !== SOLID_CELL) densityGrid[i3] += w3;
+            if (cellType[i4] !== SOLID_CELL) densityGrid[i4] += w4;
         }
 
         // If unset, calculate rest density as the average density per fluid cell.
@@ -522,13 +537,6 @@ class FlipFluidSimulation {
                 this.restDensity = densitySum / fluidCellCount;
             }
         }
-    }
-
-    isBorderCell(index) {
-        let x = index % (this.cellCountX);
-        let y = Math.floor(index / this.cellCountX);
-
-        return x === 0 || x === this.cellCountX - 1 || y === 0 || y === this.cellCountY - 1;
     }
 
     particlePositionsNDC() {
@@ -562,7 +570,7 @@ class FlipFluidSimulation {
 
         let radiusSquared = radius * radius;
         
-        // Apply repulsive force to each particle within the radius of influence.
+        // For each particle, apply repulsive force to each particle within the radius of influence.
         for (let i = 0; i < this.particleCount; i++) {
             let xi = 2 * i;
             let yi = 2 * i + 1;
@@ -640,6 +648,7 @@ let scene =
 };
 
 function initialiseScene() {
+    // Calculate simulation parameters.
     let cellSize = scene.tankHeight / scene.resolution;
     let cellCountX = Math.ceil(scene.tankWidth / cellSize)
     let cellCountY = scene.resolution;
@@ -656,6 +665,7 @@ function initialiseScene() {
 	let particleCountY = Math.floor((scene.relativeFluidHeight * simulationHeight - 2.0 * cellSize - 2.0 * particleRadius) / particleSpacingY);
 	let particleCount = particleCountX * particleCountY;
     
+    // Create simulation.
     let f = scene.flipFluidSimulation = new FlipFluidSimulation(particleCount, particleRadius, cellCountX, cellCountY, cellSize);
 
     // Initialise particles.
@@ -701,7 +711,26 @@ function initialiseScene() {
 
 
 
+
+
+
+
 initialiseScene();
+
+// Define canvas and webgl2 context.
+let canvas = document.getElementById('canvas');
+canvas.width = scene.flipFluidSimulation.width;
+canvas.height = scene.flipFluidSimulation.height;
+let gl = canvas.getContext('webgl2');
+
+
+
+
+
+
+// BUFFERS.
+let particlePositionsBuffer;
+let particleColoursBuffer;
 
 
 
@@ -711,23 +740,33 @@ initialiseScene();
 let vertexShaderSource = `#version 300 es
 precision mediump float;
 
+uniform vec2 uSimulationDomainSize;
 uniform float uPointSize;
 in vec2 aPosition;
+in vec3 aColour;
+
+out vec3 vColour;
 
 void main() {
-    gl_Position = vec4(aPosition, 0.0, 1.0);
+    vColour = aColour;
+
+    vec2 positionNDC = (aPosition / uSimulationDomainSize) * 2.0 - 1.0;
+
+    gl_Position = vec4(positionNDC, 0.0, 1.0);
     gl_PointSize = uPointSize;
 }`;
 
 let fragmentShaderSource = `#version 300 es
 precision mediump float;
 
-out vec4 fragColor;
+in vec3 vColour;
+
+out vec4 fragColour;
 
 void main() {
-    fragColor = vec4(0.0, 0.0, 1.0, 1.0);
+    fragColour = vec4(vColour, 1.0);
 
-    // Convert square point into a circle
+    // Convert square point into a circle.
     vec2 circleCoord = 2.0 * gl_PointCoord - 1.0;
     if (dot(circleCoord, circleCoord) > 1.0) {
         discard;
@@ -735,53 +774,57 @@ void main() {
 }`;
 
 
+function createShaderProgram(gl, vsSource, fsSource) {
+    let program = gl.createProgram();
 
-let canvas = document.getElementById('canvas');
-canvas.width = scene.flipFluidSimulation.width;
-canvas.height = scene.flipFluidSimulation.height;
-let gl = canvas.getContext('webgl2');
+    let vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vertexShader, vsSource);
+    gl.compileShader(vertexShader);
+    gl.attachShader(program, vertexShader);
 
+    let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fragmentShader, fsSource);
+    gl.compileShader(fragmentShader);
+    gl.attachShader(program, fragmentShader);
 
+    gl.linkProgram(program);
 
-let program = gl.createProgram();
-
-
-
-let vertexShader = gl.createShader(gl.VERTEX_SHADER);
-gl.shaderSource(vertexShader, vertexShaderSource);
-gl.compileShader(vertexShader);
-gl.attachShader(program, vertexShader);
-
-let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-gl.shaderSource(fragmentShader, fragmentShaderSource);
-gl.compileShader(fragmentShader);
-gl.attachShader(program, fragmentShader);
+    return program;
+}
 
 
+function initialiseGL() {
+    let program = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
+    gl.useProgram(program);
 
-gl.linkProgram(program);
+    // Get and set uniform locations.
+    let uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
+    let uSimulationDomainSizeLocation = gl.getUniformLocation(program, 'uSimulationDomainSize');
 
-gl.useProgram(program);
+    gl.uniform1f(uPointSizeLocation, 2.0 * scene.flipFluidSimulation.particleRadius);
+    gl.uniform2f(uSimulationDomainSizeLocation, scene.flipFluidSimulation.width, scene.flipFluidSimulation.height);
+
+    // Attribute setup.
+    let aPositionLocation = gl.getAttribLocation(program, 'aPosition');
+    let aColourLocation = gl.getAttribLocation(program, 'aColour');
+
+    gl.enableVertexAttribArray(aPositionLocation);
+    gl.enableVertexAttribArray(aColourLocation);
+
+    particlePositionsBuffer = gl.createBuffer();
+    particleColoursBuffer = gl.createBuffer();
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
+    gl.vertexAttribPointer(aPositionLocation, 2, gl.FLOAT, false, 2 * 4, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, particleColoursBuffer);
+    gl.vertexAttribPointer(aColourLocation, 3, gl.FLOAT, false, 3 * 4, 0);
+}
 
 
 
-// Uniforms.
-let particleDiameter = 2.0 * scene.flipFluidSimulation.particleRadius;
-let uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
-gl.uniform1f(uPointSizeLocation, particleDiameter);
 
-// Attributes.
-let aPositionLocation = gl.getAttribLocation(program, 'aPosition');
-gl.enableVertexAttribArray(aPositionLocation);
-
-
-
-
-let particlePositionsBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
-gl.vertexAttribPointer(aPositionLocation, 2, gl.FLOAT, false, 2 * 4, 0);
-
-
+initialiseGL();
 function animate() {
     scene.flipFluidSimulation.stepSimulation(
         scene.dt, 
@@ -793,17 +836,24 @@ function animate() {
         scene.stiffnessConstant
     )
 
-    let bufferData = scene.flipFluidSimulation.particlePositionsNDC();
+    // Update positions.
     gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, bufferData, gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, scene.flipFluidSimulation.particlePositions, gl.DYNAMIC_DRAW);
+    
+    // Update colours.
+    gl.bindBuffer(gl.ARRAY_BUFFER, particleColoursBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, scene.flipFluidSimulation.particleColours, gl.STATIC_DRAW);
 
-    gl.clearColor(0, 0, 0, 1);
+    // Clear and draw.
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.POINTS, 0, scene.flipFluidSimulation.particleCount);
 
     requestAnimationFrame(animate);
 }
-requestAnimationFrame(animate);
+animate();
+
+
 
 
 
@@ -816,7 +866,7 @@ canvas.addEventListener('mousedown', handleMouseInteraction);
 canvas.addEventListener('mousemove', handleMouseInteraction);
 
 function handleMouseInteraction(e) {
-    if (e.buttons !== 1) return;  // Only left mouse button.
+    if (e.buttons !== 1) return;  // Left mouse button.
     
     // Get mouse position in simulation coordinates.
     let rect = canvas.getBoundingClientRect();
