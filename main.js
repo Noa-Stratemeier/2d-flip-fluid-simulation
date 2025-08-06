@@ -619,23 +619,23 @@ let scene =
     // Tank.
     tankWidth: window.innerWidth - 30,
     tankHeight: window.innerHeight - 30,
-    resolution: 80,
+    resolution: 90,
     relativeFluidWidth: 0.6,
-    relativeFluidHeight: 0.7,
+    relativeFluidHeight: 0.8,
 
     // Simulation.
-    gravity: -400,
+    gravity: -1100,
     dt: 1.0 / 60.0,
     flipRatio: 0.95,
-    projectionIterations: 60,
-    particleSeparationIterations: 2,
-    overRelaxation: 1.9,
-    stiffnessConstant: 500.0,
+    projectionIterations: 50,
+    particleSeparationIterations: 1,
+    overRelaxation: 1.5,
+    stiffnessConstant: 100.0,
 
     flipFluidSimulation: null,
 
     // Interaction.
-    cursorRepelRadius: 50,
+    cursorRepelRadius: 75,
     cursorRepelStrength: 1000,
 };
 
