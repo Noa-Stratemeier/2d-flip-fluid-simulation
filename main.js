@@ -539,23 +539,6 @@ class FlipFluidSimulation {
         }
     }
 
-    particlePositionsNDC() {
-        let positions = this.particlePositions;
-        let width = this.width;
-        let height = this.height;
-
-        let particlePositionsNDC = new Float32Array(2 * this.particleCount);
-        for (let i = 0; i < this.particleCount; i++) {
-            let xi = 2 * i;
-            let yi = 2 * i + 1;
-
-            particlePositionsNDC[xi] = (positions[xi] / width) * 2 - 1;
-            particlePositionsNDC[yi] = (positions[yi] / height) * 2 - 1;
-        }
-
-        return particlePositionsNDC;
-    }
-
     /**
      * Applies a circular repulsive force to particles within a given radius of a point.
      *
@@ -599,6 +582,42 @@ class FlipFluidSimulation {
         }
     }
 
+    updateParticleColours(fadeSpeed = 0.005, lowDensityThreshold = 0.75) {
+        let positions = this.particlePositions;
+        let particleColours = this.particleColours;
+        let densityGrid = this.densityGrid;
+        let inverseCellSize = this.inverseCellSize;
+        let cellCountX = this.cellCountX;
+        let restDensity = this.restDensity;
+
+        for (let i = 0; i < this.particleCount; i++) {
+            let xi = 2 * i;
+            let yi = 2 * i + 1;
+
+            let ri = 3 * i;
+            let gi = 3 * i + 1;
+            let bi = 3 * i + 2;
+
+            particleColours[ri] = clamp(particleColours[ri] - fadeSpeed, 0.0, 1.0);
+            particleColours[gi] = clamp(particleColours[gi] - fadeSpeed, 0.0, 1.0);
+            particleColours[bi] = clamp(particleColours[bi] + fadeSpeed, 0.0, 1.0);
+
+            let gridX = Math.floor(positions[xi] * inverseCellSize);
+            let gridY = Math.floor(positions[yi] * inverseCellSize);
+            let gridIndex = gridX + gridY * cellCountX;
+
+            if (restDensity > 0.0) {
+                let relativeDensity = densityGrid[gridIndex] / restDensity;
+                if (relativeDensity < lowDensityThreshold) {
+                    let s = 0.8;
+                    particleColours[ri] = s;
+                    particleColours[gi] = s;
+                    particleColours[bi] = 1.0;
+                }
+            }
+        }
+    }
+
     stepSimulation(dt, gravity, flipRatio, overRelaxation, particleSeparationIterations, projectionIterations, stiffnessConstant) {
         this.integrateParticles(dt, gravity);
         this.separateParticles(particleSeparationIterations);
@@ -608,11 +627,21 @@ class FlipFluidSimulation {
         this.updateDensityGrid();
         this.solveIncompressibility(projectionIterations, overRelaxation, stiffnessConstant);
         this.transferVelocitiesToParticles(flipRatio);
+
+        this.updateParticleColours();
     }
 }
 
 
-
+function clamp(x, min, max) 
+{
+    if (x < min)
+        return min;
+    else if (x > max)
+        return max;
+    else 
+        return x;
+}
 
 
 
