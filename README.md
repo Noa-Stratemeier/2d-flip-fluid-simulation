@@ -2,4 +2,4 @@
 
 Work in progress.
 
-Demo: [](https://noa-stratemeier.github.io/2d-flip-fluid-simulation/)
+Demo: [Try it here](https://noa-stratemeier.github.io/2d-flip-fluid-simulation/)
