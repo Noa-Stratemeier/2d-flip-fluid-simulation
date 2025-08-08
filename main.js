@@ -553,7 +553,7 @@ class FlipFluidSimulation {
 
         let radiusSquared = radius * radius;
         
-        // For each particle, apply repulsive force to each particle within the radius of influence.
+        // Apply repulsive force to each particle within the radius of influence.
         for (let i = 0; i < this.particleCount; i++) {
             let xi = 2 * i;
             let yi = 2 * i + 1;
@@ -582,7 +582,7 @@ class FlipFluidSimulation {
         }
     }
 
-    updateParticleColours(fadeSpeed = 0.005, lowDensityThreshold = 0.75) {
+    updateParticleColours(baseColour, lowDensityColour, fadeSpeed = 0.01, lowDensityThreshold = 0.7) {
         let positions = this.particlePositions;
         let particleColours = this.particleColours;
         let densityGrid = this.densityGrid;
@@ -598,10 +598,6 @@ class FlipFluidSimulation {
             let gi = 3 * i + 1;
             let bi = 3 * i + 2;
 
-            particleColours[ri] = clamp(particleColours[ri] - fadeSpeed, 0.0, 1.0);
-            particleColours[gi] = clamp(particleColours[gi] - fadeSpeed, 0.0, 1.0);
-            particleColours[bi] = clamp(particleColours[bi] + fadeSpeed, 0.0, 1.0);
-
             let gridX = Math.floor(positions[xi] * inverseCellSize);
             let gridY = Math.floor(positions[yi] * inverseCellSize);
             let gridIndex = gridX + gridY * cellCountX;
@@ -609,14 +605,48 @@ class FlipFluidSimulation {
             if (restDensity > 0.0) {
                 let relativeDensity = densityGrid[gridIndex] / restDensity;
                 if (relativeDensity < lowDensityThreshold) {
-                    let s = 0.8;
-                    particleColours[ri] = s;
-                    particleColours[gi] = s;
-                    particleColours[bi] = 1.0;
+                    particleColours[ri] = lowDensityColour[0];
+                    particleColours[gi] = lowDensityColour[1];
+                    particleColours[bi] = lowDensityColour[2];
                 }
             }
+
+            // Fade particles towards the given base colour.
+            particleColours[ri] = FlipFluidSimulation.fadeTowards(particleColours[ri], baseColour[0], fadeSpeed);
+            particleColours[gi] = FlipFluidSimulation.fadeTowards(particleColours[gi], baseColour[1], fadeSpeed);
+            particleColours[bi] = FlipFluidSimulation.fadeTowards(particleColours[bi], baseColour[2], fadeSpeed);
         }
     }
+
+    /**
+     * Colours particles using a rainbow gradient based on their speed.
+     *
+     * @param {number} maxSpeed - Speed mapped to the highest colour value.
+     */
+    updateParticleColoursBySpeed(maxSpeed = 500) {
+        let velocities = this.particleVelocities;
+        let colours = this.particleColours;
+
+        let maxSpeedSquared = maxSpeed * maxSpeed;
+
+        for (let i = 0; i < this.particleCount; i++) {
+            let vx = velocities[2 * i];
+            let vy = velocities[2 * i + 1];
+            let speedSquared = vx * vx + vy * vy;
+
+            // Normalised speed.
+            let t = Math.sqrt(speedSquared / maxSpeedSquared);
+            t = Math.min(1.0, Math.max(0.0, t));  // Clamp
+
+            let [r, g, b] = FlipFluidSimulation.rainbowColourMap(t);
+
+            colours[3 * i + 0] = FlipFluidSimulation.fadeTowards(colours[3 * i + 0], r, 0.05);
+            colours[3 * i + 1] = FlipFluidSimulation.fadeTowards(colours[3 * i + 1], g, 0.05);
+            colours[3 * i + 2] = FlipFluidSimulation.fadeTowards(colours[3 * i + 2], b, 0.05);
+        }
+    }
+
+
 
     stepSimulation(dt, gravity, flipRatio, overRelaxation, particleSeparationIterations, projectionIterations, stiffnessConstant) {
         this.integrateParticles(dt, gravity);
@@ -627,21 +657,43 @@ class FlipFluidSimulation {
         this.updateDensityGrid();
         this.solveIncompressibility(projectionIterations, overRelaxation, stiffnessConstant);
         this.transferVelocitiesToParticles(flipRatio);
+    }
 
-        this.updateParticleColours();
+    ///////////////////////////////////////////////////////////////////////////
+    // HELPER FUNCTIONS
+    ///////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Moves a value one step toward a target at the given rate, without overshooting.
+     *
+     * @param {number} value - The current value.
+     * @param {number} target - The value to move toward.
+     * @param {number} rate - The maximum change allowed per step.
+     * @returns {number} The updated value after applying one rate-limited step.
+     */
+    static fadeTowards(value, target, rate) {
+        let delta = target - value;
+        if (Math.abs(delta) < rate) return target;
+        return value + Math.sign(delta) * rate;
+    }
+
+    /**
+     * Maps a value in [0, 1] to a rainbow colour (blue → cyan → green → yellow → red).
+     * Based on MATLAB-style "jet" colormap.
+     * 
+     * @param {number} t - Normalised value between 0.0 and 1.0.
+     * @returns {Array<number>} RGB colour in [0, 1].
+     */
+    static rainbowColourMap(t) {
+        let r = Math.min(Math.max(1.5 - Math.abs(4.0 * t - 3.0), 0.0), 1.0);
+        let g = Math.min(Math.max(1.5 - Math.abs(4.0 * t - 2.0), 0.0), 1.0);
+        let b = Math.min(Math.max(1.5 - Math.abs(4.0 * t - 1.0), 0.0), 1.0);
+
+        return [r, g, b];
     }
 }
 
 
-function clamp(x, min, max) 
-{
-    if (x < min)
-        return min;
-    else if (x > max)
-        return max;
-    else 
-        return x;
-}
 
 
 
@@ -649,16 +701,26 @@ function clamp(x, min, max)
 
 
 
-
-
-let scene = 
-{   
+let scene = {   
     // Tank.
     tankWidth: window.innerWidth - 30,
     tankHeight: window.innerHeight - 30,
     resolution: 90,
+
+    // Fluid.
     relativeFluidWidth: 0.6,
     relativeFluidHeight: 0.8,
+
+    baseColour: [0.0, 0.0, 1.0],
+    lowDensityColour: [1.0, 1.0, 1.0],
+    fadeSpeed: 0.01,
+    lowDensityThreshold: 0.7,
+
+    particleDisplaySize: 2.0,
+
+    // Interaction.
+    cursorRepelRadius: 100,
+    cursorRepelStrength: 1000,
 
     // Simulation.
     gravity: -1100,
@@ -667,13 +729,9 @@ let scene =
     projectionIterations: 50,
     particleSeparationIterations: 1,
     overRelaxation: 1.5,
-    stiffnessConstant: 100.0,
+    stiffnessConstant: 500.0,
 
     flipFluidSimulation: null,
-
-    // Interaction.
-    cursorRepelRadius: 75,
-    cursorRepelStrength: 1000,
 };
 
 function initialiseScene() {
@@ -718,9 +776,9 @@ function initialiseScene() {
         let gi = i * 3 + 1;
         let bi = i * 3 + 2;
 
-        f.particleColours[ri] = 0.0;
-        f.particleColours[gi] = 0.0;
-        f.particleColours[bi] = 1.0;
+        f.particleColours[ri] = scene.baseColour[0];
+        f.particleColours[gi] = scene.baseColour[1];
+        f.particleColours[bi] = scene.baseColour[2];
     }
 
     // Initialise solid cells.
@@ -830,7 +888,7 @@ function initialiseGL() {
     let uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
     let uSimulationDomainSizeLocation = gl.getUniformLocation(program, 'uSimulationDomainSize');
 
-    gl.uniform1f(uPointSizeLocation, 2.0 * scene.flipFluidSimulation.particleRadius);
+    gl.uniform1f(uPointSizeLocation, 2.0 * scene.flipFluidSimulation.particleRadius * scene.particleDisplaySize);
     gl.uniform2f(uSimulationDomainSizeLocation, scene.flipFluidSimulation.width, scene.flipFluidSimulation.height);
 
     // Attribute setup.
@@ -863,13 +921,23 @@ function animate() {
         scene.particleSeparationIterations, 
         scene.projectionIterations, 
         scene.stiffnessConstant
-    )
+    );
 
-    // Update positions.
+    // scene.flipFluidSimulation.updateParticleColours(
+    //     scene.baseColour, 
+    //     scene.lowDensityColour, 
+    //     scene.fadeSpeed, 
+    //     scene.lowDensityThreshold
+    // );
+
+    scene.flipFluidSimulation.updateParticleColoursBySpeed(1000);
+
+
+    // Update positions buffer.
     gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, scene.flipFluidSimulation.particlePositions, gl.DYNAMIC_DRAW);
     
-    // Update colours.
+    // Update colours buffer.
     gl.bindBuffer(gl.ARRAY_BUFFER, particleColoursBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, scene.flipFluidSimulation.particleColours, gl.STATIC_DRAW);
 
