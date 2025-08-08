@@ -973,3 +973,23 @@ function handleMouseInteraction(e) {
     // Push particles away from mouse.
     scene.flipFluidSimulation.repelParticles(mouseX, mouseY, scene.cursorRepelRadius, scene.cursorRepelStrength);
 }
+
+
+// Set up touch interaction (mobile).
+canvas.addEventListener('touchstart', handleTouchInteraction, { passive: false });
+canvas.addEventListener('touchmove', handleTouchInteraction, { passive: false });
+
+function handleTouchInteraction(e) {
+    e.preventDefault(); // Prevent scrolling
+
+    if (e.touches.length === 0) return;
+
+    let touch = e.touches[0];
+
+    let rect = canvas.getBoundingClientRect();
+    let touchX = touch.clientX - rect.left;
+    let touchY = rect.height - (touch.clientY - rect.top); // Flip Y axis
+
+    scene.flipFluidSimulation.repelParticles(touchX, touchY, 50, scene.cursorRepelStrength);
+}
+
