@@ -44,9 +44,9 @@ export default class FlipFluidSimulation {
         this.cellParticleIndices = new Int32Array(this.particleCount);
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    // MAIN SIMULATION
-    ///////////////////////////////////////////////////////////////////////////
+    // -----------------------------------------------------------------------------
+    // Main simulation methods.
+    // -----------------------------------------------------------------------------
 
     /**
      * Updates particle positions and velocities using semi-implicit Euler integration.
@@ -151,8 +151,8 @@ export default class FlipFluidSimulation {
                             let xiNeighbour = 2 * iNeighbour;
                             let yiNeighbour = 2 * iNeighbour + 1;
 
-                            // Skip self-collision: don't resolve collisions between the particle and itself.
-                            if (i === iNeighbour) continue;
+                            // Don't resolve collisions between the same two particles twice.
+                            if (iNeighbour <= i) continue;
 
                             let dx = positions[xiNeighbour] - positions[xi];
                             let dy = positions[yiNeighbour] - positions[yi];
@@ -554,9 +554,9 @@ export default class FlipFluidSimulation {
         this.transferVelocitiesToParticles(flipRatio);
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    // ADDITIONAL METHODS
-    ///////////////////////////////////////////////////////////////////////////
+    // -----------------------------------------------------------------------------
+    // Additional methods.
+    // -----------------------------------------------------------------------------
 
     /**
      * Applies a circular repulsive force to particles within a given radius of a point.
@@ -665,9 +665,9 @@ export default class FlipFluidSimulation {
         }
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    // HELPER METHODS
-    ///////////////////////////////////////////////////////////////////////////
+    // -----------------------------------------------------------------------------
+    // Helper methods.
+    // -----------------------------------------------------------------------------
 
     /**
      * Moves a value one step toward a target at the given rate, without overshooting.

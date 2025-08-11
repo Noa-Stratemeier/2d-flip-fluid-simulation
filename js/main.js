@@ -1,6 +1,7 @@
 import FlipFluidSimulation from "./FlipFluidSimulation.js";
 import FPSCounter from "./FPSCounter.js";
 import * as render from "./render.js";
+import initialiseUserInteraction from "./user-interaction.js";
 
 
 
@@ -18,7 +19,7 @@ let scene = {
 
     // Fluid.
     relativeFluidWidth: 0.6,
-    relativeFluidHeight: 0.8,
+    relativeFluidHeight: 1.0,
 
     baseColour: [0.0, 0.0, 1.0],
     lowDensityColour: [1.0, 1.0, 1.0],
@@ -126,14 +127,14 @@ function animate() {
         scene.stiffnessConstant
     );
 
-    scene.flipFluidSimulation.updateParticleColours(
-        scene.baseColour, 
-        scene.lowDensityColour, 
-        scene.fadeSpeed, 
-        scene.lowDensityThreshold
-    );
+    // scene.flipFluidSimulation.updateParticleColours(
+    //     scene.baseColour, 
+    //     scene.lowDensityColour, 
+    //     scene.fadeSpeed, 
+    //     scene.lowDensityThreshold
+    // );
 
-    //scene.flipFluidSimulation.updateParticleColoursBySpeed(1000);
+    scene.flipFluidSimulation.updateParticleColoursBySpeed(800);
 
     render.draw(gl, scene.flipFluidSimulation);
 
@@ -144,48 +145,5 @@ function animate() {
 
 initialiseScene();
 render.initialise(gl, scene.flipFluidSimulation, scene.particleDisplaySize);
+initialiseUserInteraction(canvas, scene);
 animate();
-
-
-
-
-
-
-
-
-
-// Set up mouse interaction.
-canvas.addEventListener('mousedown', handleMouseInteraction);
-canvas.addEventListener('mousemove', handleMouseInteraction);
-
-function handleMouseInteraction(e) {
-    if (e.buttons !== 1) return;  // Left mouse button.
-    
-    // Get mouse position in simulation coordinates.
-    let rect = canvas.getBoundingClientRect();
-    let mouseX = e.clientX - rect.left;
-    let mouseY = rect.height - (e.clientY - rect.top);  // Flip Y axis.
-    
-    // Push particles away from mouse.
-    scene.flipFluidSimulation.repelParticles(mouseX, mouseY, scene.cursorRepelRadius, scene.cursorRepelStrength);
-}
-
-
-// Set up touch interaction (mobile).
-canvas.addEventListener('touchstart', handleTouchInteraction, { passive: false });
-canvas.addEventListener('touchmove', handleTouchInteraction, { passive: false });
-
-function handleTouchInteraction(e) {
-    e.preventDefault(); // Prevent scrolling
-
-    if (e.touches.length === 0) return;
-
-    let touch = e.touches[0];
-
-    let rect = canvas.getBoundingClientRect();
-    let touchX = touch.clientX - rect.left;
-    let touchY = rect.height - (touch.clientY - rect.top); // Flip Y axis
-
-    scene.flipFluidSimulation.repelParticles(touchX, touchY, 50, scene.cursorRepelStrength);
-}
-

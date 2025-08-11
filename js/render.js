@@ -1,4 +1,3 @@
-// Buffers.
 let particlePositionsBuffer;
 let particleColoursBuffer;
 

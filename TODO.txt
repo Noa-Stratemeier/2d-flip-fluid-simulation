@@ -1,6 +1,6 @@
 TODO:
 PRIORITY:
-- 
+- Currently touch and mouse interaction uses same cursor repel radius and strength (cursor repel radius should probably scale based on screen dimensions.)
 
 
 GENERAL:
@@ -20,7 +20,6 @@ gl.viewport(0, 0, canvas.width, canvas.height);
 
 PERFORMANCE:
 - Check performance loss from adding getComponentData and getWeightsAndIndices functions. 
-- Check performance gain from preassigning 'let x = this.x'.
 - Check performance gain from precomputing terms in the weight calculations.
 
 
