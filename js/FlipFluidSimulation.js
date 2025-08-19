@@ -590,7 +590,7 @@ export default class FlipFluidSimulation {
                 let ndy = dy / distance;
 
                 // Quadratic falloff (stronger near the center, weaker at the edge).
-                let falloff = Math.pow(1 - distance / radius, 2);
+                let falloff = 1 - distance / radius;
 
                 let interactionForceX = (ndx * strength - velocities[xi]) * falloff;
                 let interactionForceY = (ndy * strength - velocities[yi]) * falloff;
@@ -601,7 +601,17 @@ export default class FlipFluidSimulation {
         }
     }
 
-    updateParticleColours(baseColour, lowDensityColour, fadeSpeed = 0.01, lowDensityThreshold = 0.7) {
+    /**
+     * Sets particle colours based on the density of their grid cell, then gradually fades them toward the given base colour. 
+     * If a particle's cell's local density falls below a threshold, it takes on a low-density colour. All particles then 
+     * gradually fade back toward the base colour at a given speed.
+     *
+     * @param {Array<number>} baseColour - Target base colour `[r, g, b]` to fade toward.
+     * @param {Array<number>} lowDensityColour - Colour `[r, g, b]` for particles in low-density regions.
+     * @param {number} [fadeSpeed=0.01] - Rate of fading toward baseColour.
+     * @param {number} [lowDensityThreshold=0.7] - Relative density threshold for low-density colouring.
+     */
+    updateParticleColoursByDensity(baseColour, lowDensityColour, fadeSpeed = 0.01, lowDensityThreshold = 0.7) {
         let positions = this.particlePositions;
         let particleColours = this.particleColours;
         let densityGrid = this.densityGrid;
@@ -622,6 +632,7 @@ export default class FlipFluidSimulation {
             let gridIndex = gridX + gridY * cellCountX;
 
             if (restDensity > 0.0) {
+                // Apply low-density colour if particle cell density is below given threshold.
                 let relativeDensity = densityGrid[gridIndex] / restDensity;
                 if (relativeDensity < lowDensityThreshold) {
                     particleColours[ri] = lowDensityColour[0];
@@ -655,7 +666,7 @@ export default class FlipFluidSimulation {
 
             // Normalised speed.
             let t = Math.sqrt(speedSquared / maxSpeedSquared);
-            t = Math.min(1.0, Math.max(0.0, t));  // Clamp
+            t = Math.min(1.0, Math.max(0.0, t));  // Clamp.
 
             let [r, g, b] = FlipFluidSimulation.rainbowColourMap(t);
 

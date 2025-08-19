@@ -8,8 +8,8 @@ precision mediump float;
 
 uniform vec2 uSimulationDomainSize;
 uniform float uPointSize;
-in vec2 aPosition;
-in vec3 aColour;
+layout(location = 0) in vec2 aPosition;
+layout(location = 1) in vec3 aColour;
 
 out vec3 vColour;
 
@@ -71,20 +71,17 @@ export function initialise(gl, simulation, pointScale) {
     gl.uniform2f(uSimulationDomainSizeLocation, simulation.width, simulation.height);
 
     // Attribute setup.
-    let aPositionLocation = gl.getAttribLocation(program, 'aPosition');
-    let aColourLocation = gl.getAttribLocation(program, 'aColour');
-
-    gl.enableVertexAttribArray(aPositionLocation);
-    gl.enableVertexAttribArray(aColourLocation);
+    gl.enableVertexAttribArray(0);
+    gl.enableVertexAttribArray(1);
 
     particlePositionsBuffer = gl.createBuffer();
     particleColoursBuffer = gl.createBuffer();
 
     gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
-    gl.vertexAttribPointer(aPositionLocation, 2, gl.FLOAT, false, 2 * 4, 0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 2 * 4, 0);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, particleColoursBuffer);
-    gl.vertexAttribPointer(aColourLocation, 3, gl.FLOAT, false, 3 * 4, 0);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 3 * 4, 0);
 }
 
 export function draw(gl, simulation) {

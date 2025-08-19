@@ -1,5 +1,5 @@
 /**
- * A simple FPS (frames per second) counter that updates a DOM element.
+ * A simple FPS (frames per second) counter that updates a given DOM element.
  */
 export default class FPSCounter {
     /**

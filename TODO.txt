@@ -5,30 +5,15 @@ PRIORITY:
 
 GENERAL:
 - Look to scale gravity in a way so users constant makes more sense (so -9.81 approximates reality).
-- Add the following code after gl = canvas.getContext('webgl2'); in initialiseScene() to get crisper particles:
-// Make CSS size (logical) match the simulation domain
-canvas.style.width  = scene.flipFluidSimulation.width  + 'px';
-canvas.style.height = scene.flipFluidSimulation.height + 'px';
-// Scale the backing store for HiDPI
-const dpr = Math.max(1, window.devicePixelRatio || 1);
-canvas.width  = Math.round(scene.flipFluidSimulation.width  * dpr);
-canvas.height = Math.round(scene.flipFluidSimulation.height * dpr);
-// Keep the viewport in sync
-gl.viewport(0, 0, canvas.width, canvas.height);
-
 
 
 PERFORMANCE:
-- Check performance loss from adding getComponentData and getWeightsAndIndices functions. 
-- Check performance gain from precomputing terms in the weight calculations.
+-
 
 
 CODE REFACTORING:
-- Maybe replace xi, yi with helper functions.
-- Maybe reduce code repetition.
-- Separate particles function is pretty ugly.
-- Maybe put function to compute rest density in its own method.
+-
 
 
 BUGS:
--
+- Rotating the screen to landscape on mobile devices breaks simulation.

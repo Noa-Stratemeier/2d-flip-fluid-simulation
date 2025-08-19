@@ -1,36 +1,39 @@
 import FlipFluidSimulation from "./FlipFluidSimulation.js";
+import InputHandler from "./InputHandler.js";
 import FPSCounter from "./FPSCounter.js";
 import * as render from "./render.js";
-import initialiseUserInteraction from "./user-interaction.js";
 
 
 
-let fpsCounter = new FPSCounter("fps");
 let canvas = document.getElementById('fluid-canvas');
 let gl;
+let input = new InputHandler(canvas);
+let fpsCounter = new FPSCounter("fps");
 
 
 
-let scene = {   
+let scene = {
+    // Colours.
+    colourParticlesByDensity: true,
+    baseColour: [0.0, 0.0, 1.0],
+    lowDensityColour: [1.0, 1.0, 1.0],
+
+    colourParticlesBySpeed: true,
+
     // Tank.
-    tankWidth: window.innerWidth - 50,
+    tankWidth: window.innerWidth - 10,
     tankHeight: window.innerHeight - 50,
-    resolution: 90,
+    resolution: 80,
 
     // Fluid.
     relativeFluidWidth: 0.6,
-    relativeFluidHeight: 1.0,
+    relativeFluidHeight: 0.8,
 
-    baseColour: [0.0, 0.0, 1.0],
-    lowDensityColour: [1.0, 1.0, 1.0],
-    fadeSpeed: 0.01,
-    lowDensityThreshold: 0.7,
-
-    particleDisplaySize: 2.0,
+    particleDisplaySize: 1.8,
 
     // Interaction.
-    cursorRepelRadius: 100,
-    cursorRepelStrength: 1000,
+    cursorRepelRadius: 80,
+    cursorRepelStrength: 5000,
 
     // Simulation.
     gravity: -1100,
@@ -127,14 +130,12 @@ function animate() {
         scene.stiffnessConstant
     );
 
-    // scene.flipFluidSimulation.updateParticleColours(
-    //     scene.baseColour, 
-    //     scene.lowDensityColour, 
-    //     scene.fadeSpeed, 
-    //     scene.lowDensityThreshold
-    // );
+    // Update particle colours.
+    if (scene.colourParticlesByDensity) scene.flipFluidSimulation.updateParticleColoursByDensity(scene.baseColour, scene.lowDensityColour);
+    if (scene.colourParticlesBySpeed) scene.flipFluidSimulation.updateParticleColoursBySpeed(800);
 
-    scene.flipFluidSimulation.updateParticleColoursBySpeed(800);
+    // Apply user interaction.
+    if (input.isPointerDown) scene.flipFluidSimulation.repelParticles(input.x, input.y, scene.cursorRepelRadius, scene.cursorRepelStrength);
 
     render.draw(gl, scene.flipFluidSimulation);
 
@@ -145,5 +146,4 @@ function animate() {
 
 initialiseScene();
 render.initialise(gl, scene.flipFluidSimulation, scene.particleDisplaySize);
-initialiseUserInteraction(canvas, scene);
 animate();
