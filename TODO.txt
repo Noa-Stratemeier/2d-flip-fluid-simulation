@@ -1,6 +1,5 @@
 TODO:
 PRIORITY:
-- Currently touch and mouse interaction uses same cursor repel radius and strength (cursor repel radius should probably scale based on screen dimensions.)
 
 
 GENERAL:

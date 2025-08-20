@@ -32,11 +32,11 @@ let scene = {
     particleDisplaySize: 1.8,
 
     // Interaction.
-    cursorRepelRadius: 80,
+    cursorRepelRadius: Math.min(window.innerWidth * 0.1, window.innerHeight * 0.1),
     cursorRepelStrength: 5000,
 
     // Simulation.
-    gravity: -1100,
+    gravity: -1170,
     dt: 1.0 / 60.0,
     flipRatio: 0.95,
     projectionIterations: 50,
