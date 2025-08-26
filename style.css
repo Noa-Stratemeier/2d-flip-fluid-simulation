@@ -1,6 +1,10 @@
 html, body { 
+    overflow-x: clip;
     height: 100%; 
-    margin: 0; 
+    margin: 0;
+    font-family: monospace;
+    color: white;
+    background-color: black;
 }
 
 body { 
@@ -8,7 +12,153 @@ body {
     place-items: center; 
 }
 
+
+
+#fps-counter {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    padding: 4px 8px;
+}
+
+
+
+#ui-toggle:checked ~ #ui {
+    transform: none;
+}
+
+#ui-btn {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    justify-self: end;
+    padding: 4px 8px;
+    cursor: pointer;
+    z-index: 1000;
+    transition: transform 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+#ui-btn::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: -30px;
+    background: currentColor;
+    width: 30px;
+    height: 1px;
+}
+
+#ui-btn:hover {
+    transform: translateX(-10px);
+}
+
+
+
+#ui {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    right: 0;
+    padding: 60px;
+    height: 100%;
+    background: rgba(16, 16, 16, 0.95);
+    backdrop-filter: blur(10px);
+    transform: translateX(100%);
+    transition: transform 0.4s ease;
+}
+
+.ui-folder-name {
+    margin-top: 40px;
+    margin-bottom: 10px;
+    font-size: large;
+    font-weight: 700;
+    position: relative;
+    display: inline-block;
+}
+
+.ui-folder-name::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -20px;
+    background: currentColor;
+    width: 10px;
+    height: 1px;
+}
+
+
+
+
+
 #fluid-canvas { 
     display: block; 
     touch-action: none;
+}
+
+
+
+
+
+
+
+
+
+/* Make each folder's list a 2-column grid */
+.ui-folder-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(100px, 1fr));
+    gap: 20px 40px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Inside each item: label + value on one row, slider on the next */
+.ui-item {
+    display: grid;
+    grid-template-columns: 180px 1px;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+        "label value"
+        "slider slider";
+    align-items: center;
+    gap: 4px 8px;
+}
+
+.ui-item label { 
+    grid-area: label; 
+}
+.ui-item span  { 
+    grid-area: value; 
+    justify-self: end; 
+    color: grey;
+    transition: color 0.1s linear 0s;
+}
+.ui-item input[type="range"] { 
+    grid-area: slider; 
+    width: 100%; 
+}
+
+.ui-item:has(input[type="range"]:active) span, .ui-item:has(input[type="range"]:focus-visible) span { 
+    color: white; 
+}
+
+
+.ui-item input[type="range"] {
+    accent-color: rgb(255, 255, 255);
+    height: 5px;
+    margin-top: 10px;
+}
+
+
+
+
+
+
+@media (max-width: 650px) {
+    .ui-folder-list { 
+        grid-template-columns: 1fr; 
+    }
 }

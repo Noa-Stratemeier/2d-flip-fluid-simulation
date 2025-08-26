@@ -5,47 +5,47 @@ import * as render from "./render.js";
 
 
 
-let canvas = document.getElementById('fluid-canvas');
-let gl;
-let input = new InputHandler(canvas);
-let fpsCounter = new FPSCounter("fps");
-
-
-
 let scene = {
-    // Colours.
-    colourParticlesByDensity: true,
+    // Interaction.
+    pointerInteractionRadius: Math.round(Math.min(window.innerWidth * 0.1, window.innerHeight * 0.1)),
+    pointerInteractionStrength: 1000,
+
+    // Display.
+    colourLowDensityParticles: true,
     baseColour: [0.0, 0.0, 1.0],
     lowDensityColour: [1.0, 1.0, 1.0],
 
     colourParticlesBySpeed: true,
 
+    particleDisplaySize: 1.75,
+
     // Tank.
-    tankWidth: window.innerWidth - 10,
-    tankHeight: window.innerHeight - 50,
+    tankWidth: window.innerWidth,
+    tankHeight: window.innerHeight,
     resolution: 80,
 
     // Fluid.
     relativeFluidWidth: 0.6,
     relativeFluidHeight: 0.8,
 
-    particleDisplaySize: 1.8,
-
-    // Interaction.
-    cursorRepelRadius: Math.min(window.innerWidth * 0.1, window.innerHeight * 0.1),
-    cursorRepelStrength: 5000,
-
     // Simulation.
-    gravity: -1170,
-    dt: 1.0 / 60.0,
+    gravity: -1170,  // In pixels per second squared.
+    dt: parseFloat((1.0 / 60.0).toFixed(3)),
     flipRatio: 0.95,
     projectionIterations: 50,
     particleSeparationIterations: 1,
     overRelaxation: 1.5,
-    stiffnessConstant: 500.0,
+    stiffness: 500.0,
 
     flipFluidSimulation: null,
 };
+
+
+
+let canvas = document.getElementById('fluid-canvas');
+let gl;
+let input = new InputHandler(canvas, scene);
+let fpsCounter = new FPSCounter("fps");
 
 
 
@@ -122,22 +122,22 @@ function animate() {
 
     scene.flipFluidSimulation.stepSimulation(
         scene.dt, 
-        scene.gravity, 
+        scene.gravity,
         scene.flipRatio, 
         scene.overRelaxation, 
         scene.particleSeparationIterations, 
         scene.projectionIterations, 
-        scene.stiffnessConstant
+        scene.stiffness
     );
 
     // Update particle colours.
-    if (scene.colourParticlesByDensity) scene.flipFluidSimulation.updateParticleColoursByDensity(scene.baseColour, scene.lowDensityColour);
-    if (scene.colourParticlesBySpeed) scene.flipFluidSimulation.updateParticleColoursBySpeed(800);
+    if (scene.colourLowDensityParticles) scene.flipFluidSimulation.updateParticleColoursByLowDensity(scene.baseColour, scene.lowDensityColour);
+    if (scene.colourParticlesBySpeed) scene.flipFluidSimulation.updateParticleColoursBySpeed();
 
-    // Apply user interaction.
-    if (input.isPointerDown) scene.flipFluidSimulation.repelParticles(input.x, input.y, scene.cursorRepelRadius, scene.cursorRepelStrength);
+    // Apply user pointer interaction.
+    if (input.isPointerDown) scene.flipFluidSimulation.repelParticles(input.pointerX, input.pointerY, scene.pointerInteractionRadius, scene.pointerInteractionStrength);
 
-    render.draw(gl, scene.flipFluidSimulation);
+    render.draw(gl, scene.flipFluidSimulation, scene.particleDisplaySize);
 
     requestAnimationFrame(animate);
 }

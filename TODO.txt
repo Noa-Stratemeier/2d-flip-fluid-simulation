@@ -1,9 +1,11 @@
 TODO:
 PRIORITY:
+- Make a display for particle count.
 
 
 GENERAL:
-- Look to scale gravity in a way so users constant makes more sense (so -9.81 approximates reality).
+- Make it that interaction radius can only reach a maximum of 90% of half the smallest screen dimension.
+- Make it that interaction doesn't get stuck on the walls when the cursor leaves the canvas.
 
 
 PERFORMANCE:
@@ -15,4 +17,5 @@ CODE REFACTORING:
 
 
 BUGS:
-- Rotating the screen to landscape on mobile devices breaks simulation.
+- Rotating the screen to landscape on mobile devices breaks simulation (I think this happens when the Y-cells (resolution) makes the cell width smaller than or equal to 1 pixel).
+- Particle scale slider sometimes gets stuck with cursor as red circle with diagonal cross through it.

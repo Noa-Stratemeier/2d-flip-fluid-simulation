@@ -4,13 +4,111 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="author" content="Noa Stratemeier">
+        <meta name="description" content="A real-time interactive 2D FLIP fluid simulation in WebGL, featuring adjustable physics and rendering controls.">
         <title>2D FLIP Fluid Simulation</title>
         <link rel="stylesheet" href="style.css">
         <script type="module" src="js/main.js"></script>
     </head>
 
     <body>
-        <div id="fps-counter"> FPS: <span id="fps">0</span></div>
+        <div id="fps-counter">FPS: <span id="fps">0</span></div>
+
+        <input id="ui-toggle" type="checkbox" hidden>
+        <label for="ui-toggle" id="ui-btn">OPEN</label>
+        <script>
+            let uiToggleCheckbox = document.getElementById("ui-toggle");
+            let uiToggleLabel = document.getElementById("ui-btn");
+
+            uiToggleCheckbox.addEventListener("change", () => {
+                if (uiToggleCheckbox.checked) {
+                    uiToggleLabel.textContent = "CLOSE";
+                } else {
+                    uiToggleLabel.textContent = "OPEN";
+                }
+            });
+        </script>
+
+        <aside id="ui">
+            <div id="inner-ui">
+                <div class="ui-folder">
+                <div class="ui-folder-name">Interaction</div>
+                <ul class="ui-folder-list">
+                    <li class="ui-item">
+                        <label for="pointerInteractionRadius-slider">radius</label> 
+                        <span id="pointerInteractionRadius-value"></span>
+                        <input id="pointerInteractionRadius-slider" type="range" min="10" max="500" step="10">
+                    </li>
+                    <li class="ui-item">
+                        <label for="pointerInteractionStrength-slider">strength</label> 
+                        <span id="pointerInteractionStrength-value"></span>
+                        <input id="pointerInteractionStrength-slider" type="range" min="100" max="5000" step="100">
+                    </li>
+                </ul>
+                </div>
+                <div class="ui-folder">
+                    <div class="ui-folder-name">Rendering</div>
+                    <ul class="ui-folder-list">
+                        <li class="ui-item">
+                            <label for="colourLowDensityParticles-toggle">colour by density</label>
+                            <span>
+                                <input id="colourLowDensityParticles-toggle" type="checkbox">
+                            </span>
+                        </li>
+                        <li class="ui-item">
+                            <label for="colourParticlesBySpeed-toggle">colour by speed</label>
+                            <span>
+                                <input id="colourParticlesBySpeed-toggle" type="checkbox">
+                            </span>
+                        </li>
+                        <li class="ui-item">
+                            <label for="particleDisplaySize-slider">particle scale</label> 
+                            <span id="particleDisplaySize-value"></span>
+                            <input id="particleDisplaySize-slider" type="range" min="0.25" max="5.0" step="0.25">
+                        </li>
+                    </ul>
+                </div>
+                <div class="ui-folder">
+                    <div class="ui-folder-name">Simulation</div>
+                    <ul class="ui-folder-list">
+                        <li class="ui-item">
+                            <label for="gravity-slider">gravity</label> 
+                            <span id="gravity-value"></span>
+                            <input id="gravity-slider" type="range" min="-5000" max="0" step="100">
+                        </li>
+                        <li class="ui-item">
+                            <label for="dt-slider">dt</label> 
+                            <span id="dt-value"></span>
+                            <input id="dt-slider" type="range" min="0.0002" max="0.02" step="0.0001">
+                        </li>
+                        <li class="ui-item">
+                            <label for="flipRatio-slider">flip ratio</label> 
+                            <span id="flipRatio-value"></span>
+                            <input id="flipRatio-slider" type="range" min="0" max="1" step="0.05">
+                        </li>
+                        <li class="ui-item">
+                            <label for="projectionIterations-slider">projection iterations</label> 
+                            <span id="projectionIterations-value"></span>
+                            <input id="projectionIterations-slider" type="range" min="0" max="100" step="10">
+                        </li>
+                        <li class="ui-item">
+                            <label for="particleSeparationIterations-slider">separation iterations</label> 
+                            <span id="particleSeparationIterations-value"></span>
+                            <input id="particleSeparationIterations-slider" type="range" min="0" max="5" step="1">
+                        </li>
+                        <li class="ui-item">
+                            <label for="overRelaxation-slider">over relaxation</label> 
+                            <span id="overRelaxation-value"></span>
+                            <input id="overRelaxation-slider" type="range" min="1.0" max="1.95" step="0.05">
+                        </li>
+                        <li class="ui-item">
+                            <label for="stiffness-slider">stiffness</label> 
+                            <span id="stiffness-value"></span>
+                            <input id="stiffness-slider" type="range" min="0" max="1000" step="10">
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
 
         <canvas id="fluid-canvas"></canvas>
     </body>

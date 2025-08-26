@@ -2,7 +2,19 @@ const SOLID_CELL = 0;
 const FLUID_CELL = 1;
 const EMPTY_CELL = 2;
 
+/**
+ * Implements a 2D FLIP fluid solver.
+ */
 export default class FlipFluidSimulation {
+    /**
+     * Creates a new fluid simulation with given particle and grid parameters.
+     *
+     * @param {number} particleCount - Number of fluid particles.
+     * @param {number} particleRadius - Interaction radius of each particle.
+     * @param {number} cellCountX - Number of grid cells along the x-axis.
+     * @param {number} cellCountY - Number of grid cells along the y-axis.
+     * @param {number} cellSize - Physical size of each grid cell (width).
+     */
     constructor(particleCount, particleRadius, cellCountX, cellCountY, cellSize) {
         this.particleCount = particleCount;
         this.particleRadius = particleRadius;
@@ -608,10 +620,10 @@ export default class FlipFluidSimulation {
      *
      * @param {Array<number>} baseColour - Target base colour `[r, g, b]` to fade toward.
      * @param {Array<number>} lowDensityColour - Colour `[r, g, b]` for particles in low-density regions.
-     * @param {number} [fadeSpeed=0.01] - Rate of fading toward baseColour.
-     * @param {number} [lowDensityThreshold=0.7] - Relative density threshold for low-density colouring.
+     * @param {number} [fadeSpeed] - Rate of fading toward baseColour.
+     * @param {number} [lowDensityThreshold] - Relative density threshold for low-density colouring.
      */
-    updateParticleColoursByDensity(baseColour, lowDensityColour, fadeSpeed = 0.01, lowDensityThreshold = 0.7) {
+    updateParticleColoursByLowDensity(baseColour, lowDensityColour, fadeSpeed = 0.01, lowDensityThreshold = 0.7) {
         let positions = this.particlePositions;
         let particleColours = this.particleColours;
         let densityGrid = this.densityGrid;
@@ -653,7 +665,7 @@ export default class FlipFluidSimulation {
      *
      * @param {number} maxSpeed - Speed mapped to the highest colour value.
      */
-    updateParticleColoursBySpeed(maxSpeed = 500) {
+    updateParticleColoursBySpeed(maxSpeed = 800) {
         let velocities = this.particleVelocities;
         let colours = this.particleColours;
 
@@ -709,4 +721,3 @@ export default class FlipFluidSimulation {
         return [r, g, b];
     }
 }
-

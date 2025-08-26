@@ -1,3 +1,6 @@
+let program;
+let uPointSizeLocation;
+
 let particlePositionsBuffer;
 let particleColoursBuffer;
 
@@ -60,11 +63,11 @@ function createShaderProgram(gl, vsSource, fsSource) {
 }
 
 export function initialise(gl, simulation, pointScale) {
-    let program = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
+    program = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
     gl.useProgram(program);
 
     // Get and set uniform locations.
-    let uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
+    uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
     let uSimulationDomainSizeLocation = gl.getUniformLocation(program, 'uSimulationDomainSize');
 
     gl.uniform1f(uPointSizeLocation, 2.0 * simulation.particleRadius * pointScale);
@@ -84,7 +87,10 @@ export function initialise(gl, simulation, pointScale) {
     gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 3 * 4, 0);
 }
 
-export function draw(gl, simulation) {
+export function draw(gl, simulation, pointScale) {
+    // Update current displayed point size.
+    gl.uniform1f(uPointSizeLocation, 2.0 * simulation.particleRadius * pointScale);
+
     // Update positions buffer.
     gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, simulation.particlePositions, gl.DYNAMIC_DRAW);
