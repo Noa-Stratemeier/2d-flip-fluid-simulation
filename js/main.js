@@ -11,13 +11,15 @@ let scene = {
     pointerInteractionStrength: 1000,
 
     // Display.
-    colourLowDensityParticles: true,
+    colourLowDensityParticles: false,
     baseColour: [0.0, 0.0, 1.0],
     lowDensityColour: [1.0, 1.0, 1.0],
 
     colourParticlesBySpeed: true,
+    speedColourMap: 'rainbow',  // 'viridis' | 'rainbow' | 'fire' | 'ice' | 'greyscale'.
 
-    particleDisplaySize: 1.75,
+
+    particleDisplaySize: 1.0,
 
     // Tank.
     tankWidth: window.innerWidth,
@@ -30,7 +32,7 @@ let scene = {
 
     // Simulation.
     gravity: -1170,  // In pixels per second squared.
-    dt: parseFloat((1.0 / 60.0).toFixed(3)),
+    dt: 0.0167,
     flipRatio: 0.95,
     projectionIterations: 50,
     particleSeparationIterations: 1,
@@ -41,10 +43,17 @@ let scene = {
 };
 
 
+// --- add this function ---
+function rebuildDomain() {
+    initialiseScene();
+    render.initialise(gl, scene.flipFluidSimulation, scene.particleDisplaySize);
+}
+
+
 
 let canvas = document.getElementById('fluid-canvas');
 let gl;
-let input = new InputHandler(canvas, scene);
+let input = new InputHandler(canvas, scene, rebuildDomain);
 let fpsCounter = new FPSCounter("fps");
 
 
@@ -132,7 +141,7 @@ function animate() {
 
     // Update particle colours.
     if (scene.colourLowDensityParticles) scene.flipFluidSimulation.updateParticleColoursByLowDensity(scene.baseColour, scene.lowDensityColour);
-    if (scene.colourParticlesBySpeed) scene.flipFluidSimulation.updateParticleColoursBySpeed();
+    if (scene.colourParticlesBySpeed) scene.flipFluidSimulation.updateParticleColoursBySpeed(800, FlipFluidSimulation.colourMaps[scene.speedColourMap]);
 
     // Apply user pointer interaction.
     if (input.isPointerDown) scene.flipFluidSimulation.repelParticles(input.pointerX, input.pointerY, scene.pointerInteractionRadius, scene.pointerInteractionStrength);

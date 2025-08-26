@@ -664,8 +664,9 @@ export default class FlipFluidSimulation {
      * Colours particles using a rainbow gradient based on their speed.
      *
      * @param {number} maxSpeed - Speed mapped to the highest colour value.
+     * @param {(t:number)=>[number,number,number]} [colourMap] - Function mapping t∈[0,1] → [r,g,b].
      */
-    updateParticleColoursBySpeed(maxSpeed = 800) {
+    updateParticleColoursBySpeed(maxSpeed = 800, colourMap) {
         let velocities = this.particleVelocities;
         let colours = this.particleColours;
 
@@ -680,7 +681,7 @@ export default class FlipFluidSimulation {
             let t = Math.sqrt(speedSquared / maxSpeedSquared);
             t = Math.min(1.0, Math.max(0.0, t));  // Clamp.
 
-            let [r, g, b] = FlipFluidSimulation.rainbowColourMap(t);
+            let [r, g, b] = colourMap(t);
 
             colours[3 * i + 0] = FlipFluidSimulation.fadeTowards(colours[3 * i + 0], r, 0.05);
             colours[3 * i + 1] = FlipFluidSimulation.fadeTowards(colours[3 * i + 1], g, 0.05);
@@ -720,4 +721,78 @@ export default class FlipFluidSimulation {
 
         return [r, g, b];
     }
+
+
+
+
+
+
+
+
+
+    // Linear helpers for custom gradients
+    static _lerp(a, b, t) { return a + (b - a) * t; }
+    static _lerp3(c0, c1, t) {
+        return [
+            FlipFluidSimulation._lerp(c0[0], c1[0], t),
+            FlipFluidSimulation._lerp(c0[1], c1[1], t),
+            FlipFluidSimulation._lerp(c0[2], c1[2], t),
+        ];
+    }
+
+    /**
+     * Build a gradient function from stops: [[t0,[r,g,b]],[t1,[r,g,b]],...]
+     * t must be ascending in [0,1]. Returns (t)=>[r,g,b] with linear interpolation.
+     */
+    static makeGradient(stops) {
+        return (t) => {
+            t = Math.min(1, Math.max(0, t));
+            for (let i = 1; i < stops.length; i++) {
+                const [t1, c1] = stops[i];
+                const [t0, c0] = stops[i - 1];
+                if (t <= t1) {
+                    const u = (t - t0) / Math.max(1e-8, (t1 - t0));
+                    return FlipFluidSimulation._lerp3(c0, c1, u);
+                }
+            }
+            return stops[stops.length - 1][1];
+        };
+    }
+
+    /** A few ready-to-use maps */
+    static colourMaps = {
+        // Your existing "jet"-style rainbow
+        rainbow: (t) => FlipFluidSimulation.rainbowColourMap(t),
+
+        // Perceptually nicer options:
+        // Rough Viridis-like (dark blue → green → yellow)
+        viridis: FlipFluidSimulation.makeGradient([
+            [0.00, [0.267, 0.005, 0.329]],
+            [0.25, [0.283, 0.141, 0.458]],
+            [0.50, [0.254, 0.265, 0.530]],
+            [0.75, [0.207, 0.372, 0.553]],
+            [1.00, [0.993, 0.906, 0.144]],
+        ]),
+
+        // Fire (black → red → orange → yellow → white)
+        fire: FlipFluidSimulation.makeGradient([
+            [0.00, [0.00, 0.00, 0.00]],
+            [0.30, [0.50, 0.00, 0.00]],
+            [0.60, [1.00, 0.30, 0.00]],
+            [0.80, [1.00, 0.80, 0.00]],
+            [1.00, [1.00, 1.00, 1.00]],
+        ]),
+
+        // Ice (navy → blue → cyan → white)
+        ice: FlipFluidSimulation.makeGradient([
+            [0.00, [0.02, 0.05, 0.25]],
+            [0.35, [0.05, 0.20, 0.75]],
+            [0.70, [0.10, 0.80, 0.90]],
+            [1.00, [1.00, 1.00, 1.00]],
+        ]),
+
+        // Greyscale (black → white)
+        greyscale: (t) => [t, t, t],
+    };
+
 }

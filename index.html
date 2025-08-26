@@ -31,19 +31,19 @@
         <aside id="ui">
             <div id="inner-ui">
                 <div class="ui-folder">
-                <div class="ui-folder-name">Interaction</div>
-                <ul class="ui-folder-list">
-                    <li class="ui-item">
-                        <label for="pointerInteractionRadius-slider">radius</label> 
-                        <span id="pointerInteractionRadius-value"></span>
-                        <input id="pointerInteractionRadius-slider" type="range" min="10" max="500" step="10">
-                    </li>
-                    <li class="ui-item">
-                        <label for="pointerInteractionStrength-slider">strength</label> 
-                        <span id="pointerInteractionStrength-value"></span>
-                        <input id="pointerInteractionStrength-slider" type="range" min="100" max="5000" step="100">
-                    </li>
-                </ul>
+                    <div class="ui-folder-name">Interaction</div>
+                    <ul class="ui-folder-list">
+                        <li class="ui-item">
+                            <label for="pointerInteractionRadius-slider">radius</label> 
+                            <span id="pointerInteractionRadius-value"></span>
+                            <input id="pointerInteractionRadius-slider" type="range" min="10" max="500" step="10">
+                        </li>
+                        <li class="ui-item">
+                            <label for="pointerInteractionStrength-slider">strength</label> 
+                            <span id="pointerInteractionStrength-value"></span>
+                            <input id="pointerInteractionStrength-slider" type="range" min="100" max="5000" step="100">
+                        </li>
+                    </ul>
                 </div>
                 <div class="ui-folder">
                     <div class="ui-folder-name">Rendering</div>
@@ -59,6 +59,16 @@
                             <span>
                                 <input id="colourParticlesBySpeed-toggle" type="checkbox">
                             </span>
+                        </li>
+                        <li class="ui-item">
+                            <label for="speedColourMap-select">speed colour map</label>
+                            <select id="speedColourMap-select">
+                                <option value="viridis">viridis</option>
+                                <option value="rainbow">rainbow</option>
+                                <option value="fire">fire</option>
+                                <option value="ice">ice</option>
+                                <option value="greyscale">greyscale</option>
+                            </select>
                         </li>
                         <li class="ui-item">
                             <label for="particleDisplaySize-slider">particle scale</label> 
@@ -104,6 +114,26 @@
                             <label for="stiffness-slider">stiffness</label> 
                             <span id="stiffness-value"></span>
                             <input id="stiffness-slider" type="range" min="0" max="1000" step="10">
+                        </li>
+                    </ul>
+                </div>
+                <div class="ui-folder">
+                    <div class="ui-folder-name">Domain</div>
+                    <ul class="ui-folder-list">
+                        <li class="ui-item">
+                            <label for="relativeFluidWidth-slider">fluid width</label> 
+                            <span id="relativeFluidWidth-value"></span>
+                            <input id="relativeFluidWidth-slider" type="range" min="0.1" max="1.0" step="0.05">
+                        </li>
+                        <li class="ui-item">
+                            <label for="relativeFluidHeight-slider">fluid height</label> 
+                            <span id="relativeFluidHeight-value"></span>
+                            <input id="relativeFluidHeight-slider" type="range" min="0.1" max="1.0" step="0.05">
+                        </li>
+                        <li class="ui-item">
+                            <label for="resolution-slider">resolution</label> 
+                            <span id="resolution-value"></span>
+                            <input id="resolution-slider" type="range" min="10" max="120" step="10">
                         </li>
                     </ul>
                 </div>
