@@ -614,22 +614,30 @@ export default class FlipFluidSimulation {
     }
 
     /**
-     * Sets particle colours based on the density of their grid cell, then gradually fades them toward the given base colour. 
-     * If a particle's cell's local density falls below a threshold, it takes on a low-density colour. All particles then 
-     * gradually fade back toward the base colour at a given speed.
+     * Updates each particle’s colour by fading it toward a target determined by density and/or velocity. By default
+     * particles move toward `baseColour`. If `colourLowDensityParticles` is enabled and the particle’s grid cell 
+     * density falls below a threshold, it takes on `lowDensityColour`. Otherwise, if `colourParticlesBySpeed` is 
+     * enabled, the particle is coloured using `speedColourMap` based on its normalised speed. Low-density colouring 
+     * takes precedence over speed colouring when both are enabled.
      *
-     * @param {Array<number>} baseColour - Target base colour `[r, g, b]` to fade toward.
-     * @param {Array<number>} lowDensityColour - Colour `[r, g, b]` for particles in low-density regions.
-     * @param {number} [fadeSpeed] - Rate of fading toward baseColour.
-     * @param {number} [lowDensityThreshold] - Relative density threshold for low-density colouring.
+     * @param {Array<number>} baseColour - RGB colour for normal particles.
+     * @param {Array<number>} lowDensityColour - RGB colour for low density particles.
+     * @param {boolean} colourLowDensityParticles - Enable low density colouring.
+     * @param {boolean} colourParticlesBySpeed - Enable speed-based colouring.
+     * @param {function} speedColourMap - Function mapping normalised speed (0-1) to RGB colour.
      */
-    updateParticleColoursByLowDensity(baseColour, lowDensityColour, fadeSpeed = 0.01, lowDensityThreshold = 0.7) {
+    updateParticleColours(baseColour, lowDensityColour, colourLowDensityParticles, colourParticlesBySpeed, speedColourMap) {
         let positions = this.particlePositions;
-        let particleColours = this.particleColours;
+        let velocities = this.particleVelocities;
+        let colours = this.particleColours;
         let densityGrid = this.densityGrid;
         let inverseCellSize = this.inverseCellSize;
         let cellCountX = this.cellCountX;
         let restDensity = this.restDensity;
+
+        let lowDensityThreshold = 0.70;
+        let maxSpeed = 800;
+        let maxSpeedSquared = maxSpeed * maxSpeed;
 
         for (let i = 0; i < this.particleCount; i++) {
             let xi = 2 * i;
@@ -639,53 +647,43 @@ export default class FlipFluidSimulation {
             let gi = 3 * i + 1;
             let bi = 3 * i + 2;
 
-            let gridX = Math.floor(positions[xi] * inverseCellSize);
-            let gridY = Math.floor(positions[yi] * inverseCellSize);
-            let gridIndex = gridX + gridY * cellCountX;
+            // Fade speeds for the different colours.
+            let baseColourFade = 0.005;
+            let lowDensityColourFade = 1.0;
+            let particleSpeedColourFade = 0.05;
 
-            if (restDensity > 0.0) {
-                // Apply low-density colour if particle cell density is below given threshold.
+            // Default to base colour and fade speed.
+            let targetColour = baseColour;
+            let fadeSpeed = baseColourFade;
+
+            // Low density logic.
+            let isLowDensity = false;
+            if (colourLowDensityParticles && restDensity > 0.0) {
+                let gridX = Math.floor(positions[xi] * inverseCellSize);
+                let gridY = Math.floor(positions[yi] * inverseCellSize);
+                let gridIndex = gridX + gridY * cellCountX;
                 let relativeDensity = densityGrid[gridIndex] / restDensity;
                 if (relativeDensity < lowDensityThreshold) {
-                    particleColours[ri] = lowDensityColour[0];
-                    particleColours[gi] = lowDensityColour[1];
-                    particleColours[bi] = lowDensityColour[2];
+                    targetColour = lowDensityColour;
+                    isLowDensity = true;
+                    fadeSpeed = lowDensityColourFade;
                 }
             }
 
-            // Fade particles towards the given base colour.
-            particleColours[ri] = FlipFluidSimulation.fadeTowards(particleColours[ri], baseColour[0], fadeSpeed);
-            particleColours[gi] = FlipFluidSimulation.fadeTowards(particleColours[gi], baseColour[1], fadeSpeed);
-            particleColours[bi] = FlipFluidSimulation.fadeTowards(particleColours[bi], baseColour[2], fadeSpeed);
-        }
-    }
+            // Speed logic (only if not low density).
+            if (colourParticlesBySpeed && !isLowDensity) {
+                let vx = velocities[xi]
+                let vy = velocities[yi];
+                let t = Math.sqrt((vx * vx + vy * vy) / maxSpeedSquared);
+                t = Math.min(1.0, Math.max(0.0, t));
+                targetColour = speedColourMap(t);
+                fadeSpeed = particleSpeedColourFade;
+            }
 
-    /**
-     * Colours particles using a rainbow gradient based on their speed.
-     *
-     * @param {number} maxSpeed - Speed mapped to the highest colour value.
-     * @param {(t:number)=>[number,number,number]} [colourMap] - Function mapping t∈[0,1] → [r,g,b].
-     */
-    updateParticleColoursBySpeed(maxSpeed = 800, colourMap) {
-        let velocities = this.particleVelocities;
-        let colours = this.particleColours;
-
-        let maxSpeedSquared = maxSpeed * maxSpeed;
-
-        for (let i = 0; i < this.particleCount; i++) {
-            let vx = velocities[2 * i];
-            let vy = velocities[2 * i + 1];
-            let speedSquared = vx * vx + vy * vy;
-
-            // Normalised speed.
-            let t = Math.sqrt(speedSquared / maxSpeedSquared);
-            t = Math.min(1.0, Math.max(0.0, t));  // Clamp.
-
-            let [r, g, b] = colourMap(t);
-
-            colours[3 * i + 0] = FlipFluidSimulation.fadeTowards(colours[3 * i + 0], r, 0.05);
-            colours[3 * i + 1] = FlipFluidSimulation.fadeTowards(colours[3 * i + 1], g, 0.05);
-            colours[3 * i + 2] = FlipFluidSimulation.fadeTowards(colours[3 * i + 2], b, 0.05);
+            // Fade current colour toward target.
+            colours[ri] = FlipFluidSimulation.fadeTowards(colours[ri], targetColour[0], fadeSpeed);
+            colours[gi] = FlipFluidSimulation.fadeTowards(colours[gi], targetColour[1], fadeSpeed);
+            colours[bi] = FlipFluidSimulation.fadeTowards(colours[bi], targetColour[2], fadeSpeed);
         }
     }
 
@@ -761,7 +759,7 @@ export default class FlipFluidSimulation {
         /** A bunch of ready-to-use maps */
     static colourMaps = {
         // Your existing ones
-        rainbow: (t) => FlipFluidSimulation.rainbowColourMap(t),
+        jet: (t) => FlipFluidSimulation.rainbowColourMap(t),
 
         // Fire (black → red → orange → yellow → white)
         fire: FlipFluidSimulation.makeGradient([

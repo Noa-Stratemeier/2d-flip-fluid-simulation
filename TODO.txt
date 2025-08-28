@@ -18,4 +18,9 @@ CODE REFACTORING:
 
 BUGS:
 - Rotating the screen to landscape on mobile devices breaks simulation (I think this happens when the Y-cells (resolution) makes the cell width smaller than or equal to 1 pixel).
-- Particle scale slider sometimes gets stuck with cursor as red circle with diagonal cross through it.
+- Particle scale slider sometimes gets stuck with cursor as red circle with diagonal cross through it (happens when something is selected (like text), then when dragging the computer thinks you are copying the selected thing somewhere).
+- When you turn off all particle separating forces, and force all particles into the exact same position (so all particles are exactly overlapping), then the simulation cannot recover (since overlaps aren't resolved for completely overlapping particles).
+
+
+NTH:
+- Make low density colour particles fade into the speed colour when both are active.

@@ -11,12 +11,12 @@ let scene = {
     pointerInteractionStrength: 1000,
 
     // Display.
-    colourLowDensityParticles: false,
+    colourLowDensityParticles: true,
     baseColour: [0.0, 0.0, 1.0],
     lowDensityColour: [1.0, 1.0, 1.0],
 
     colourParticlesBySpeed: true,
-    speedColourMap: "rainbow",  // 'rainbow' | 'fire' | 'ice' | 'greyscale' | 'plasma' | 'magma' | 'coolwarm'.
+    speedColourMap: "plasma",  // 'jet' | 'fire' | 'ice' | 'greyscale' | 'plasma' | 'magma' | 'coolwarm'.
 
     particleDisplaySize: 1.75,
 
@@ -137,8 +137,13 @@ function animate() {
     );
 
     // Update particle colours.
-    if (scene.colourLowDensityParticles) scene.flipFluidSimulation.updateParticleColoursByLowDensity(scene.baseColour, scene.lowDensityColour);
-    if (scene.colourParticlesBySpeed) scene.flipFluidSimulation.updateParticleColoursBySpeed(800, FlipFluidSimulation.colourMaps[scene.speedColourMap]);
+    scene.flipFluidSimulation.updateParticleColours(
+        scene.baseColour,
+        scene.lowDensityColour,
+        scene.colourLowDensityParticles,
+        scene.colourParticlesBySpeed,
+        FlipFluidSimulation.colourMaps[scene.speedColourMap]
+    );
 
     // Apply user pointer interaction.
     if (input.isPointerDown) scene.flipFluidSimulation.repelParticles(input.pointerX, input.pointerY, scene.pointerInteractionRadius, scene.pointerInteractionStrength);
