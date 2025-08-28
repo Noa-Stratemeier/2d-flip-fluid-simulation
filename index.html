@@ -14,19 +14,7 @@
         <div id="fps-counter">FPS: <span id="fps">0</span></div>
 
         <input id="ui-toggle" type="checkbox" hidden>
-        <label for="ui-toggle" id="ui-btn">OPEN</label>
-        <script>
-            let uiToggleCheckbox = document.getElementById("ui-toggle");
-            let uiToggleLabel = document.getElementById("ui-btn");
-
-            uiToggleCheckbox.addEventListener("change", () => {
-                if (uiToggleCheckbox.checked) {
-                    uiToggleLabel.textContent = "CLOSE";
-                } else {
-                    uiToggleLabel.textContent = "OPEN";
-                }
-            });
-        </script>
+        <label for="ui-toggle" id="ui-toggle-label">OPEN</label>
 
         <aside id="ui">
             <div id="inner-ui">
@@ -48,26 +36,28 @@
                 <div class="ui-folder">
                     <div class="ui-folder-name">Rendering</div>
                     <ul class="ui-folder-list">
-                        <li class="ui-item">
-                            <label for="colourLowDensityParticles-toggle">colour by density</label>
-                            <span>
+                        <li class="ui-item ui-toggle-item">
+                            <label class="ui-toggle-btn" for="colourLowDensityParticles-toggle">
+                                colour by density
                                 <input id="colourLowDensityParticles-toggle" type="checkbox">
-                            </span>
+                            </label>
                         </li>
-                        <li class="ui-item">
-                            <label for="colourParticlesBySpeed-toggle">colour by speed</label>
-                            <span>
+                        <li class="ui-item ui-toggle-item">
+                            <label class="ui-toggle-btn" for="colourParticlesBySpeed-toggle">
+                                colour by speed
                                 <input id="colourParticlesBySpeed-toggle" type="checkbox">
-                            </span>
+                            </label>
                         </li>
                         <li class="ui-item">
                             <label for="speedColourMap-select">speed colour map</label>
                             <select id="speedColourMap-select">
-                                <option value="viridis">viridis</option>
                                 <option value="rainbow">rainbow</option>
                                 <option value="fire">fire</option>
                                 <option value="ice">ice</option>
                                 <option value="greyscale">greyscale</option>
+                                <option value="plasma">plasma</option>
+                                <option value="magma">magma</option>
+                                <option value="coolwarm">coolwarm</option>
                             </select>
                         </li>
                         <li class="ui-item">
@@ -113,7 +103,7 @@
                         <li class="ui-item">
                             <label for="stiffness-slider">stiffness</label> 
                             <span id="stiffness-value"></span>
-                            <input id="stiffness-slider" type="range" min="0" max="1000" step="10">
+                            <input id="stiffness-slider" type="range" min="0" max="500" step="10">
                         </li>
                     </ul>
                 </div>

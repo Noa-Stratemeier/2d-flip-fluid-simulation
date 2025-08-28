@@ -16,10 +16,9 @@ let scene = {
     lowDensityColour: [1.0, 1.0, 1.0],
 
     colourParticlesBySpeed: true,
-    speedColourMap: 'rainbow',  // 'viridis' | 'rainbow' | 'fire' | 'ice' | 'greyscale'.
+    speedColourMap: "rainbow",  // 'rainbow' | 'fire' | 'ice' | 'greyscale' | 'plasma' | 'magma' | 'coolwarm'.
 
-
-    particleDisplaySize: 1.0,
+    particleDisplaySize: 1.75,
 
     // Tank.
     tankWidth: window.innerWidth,
@@ -37,26 +36,24 @@ let scene = {
     projectionIterations: 50,
     particleSeparationIterations: 1,
     overRelaxation: 1.5,
-    stiffness: 500.0,
+    stiffness: 250.0,
 
     flipFluidSimulation: null,
 };
 
 
-// --- add this function ---
-function rebuildDomain() {
-    initialiseScene();
-    render.initialise(gl, scene.flipFluidSimulation, scene.particleDisplaySize);
-}
 
-
-
-let canvas = document.getElementById('fluid-canvas');
+let canvas = document.getElementById("fluid-canvas");
 let gl;
 let input = new InputHandler(canvas, scene, rebuildDomain);
 let fpsCounter = new FPSCounter("fps");
 
 
+
+function rebuildDomain() {
+    initialiseScene();
+    render.initialise(gl, scene.flipFluidSimulation, scene.particleDisplaySize);
+}
 
 function initialiseScene() {
     // Calculate simulation parameters.
@@ -84,7 +81,7 @@ function initialiseScene() {
     // align exactly with the simulation grid.
     canvas.width = fluid.width;
     canvas.height = fluid.height;
-    gl = canvas.getContext('webgl2');
+    gl = canvas.getContext("webgl2");
 
     // Initialise particles.
     let i = 0;

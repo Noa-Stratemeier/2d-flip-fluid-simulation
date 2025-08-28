@@ -13,6 +13,11 @@ export default class InputHandler {
         canvas.addEventListener("pointermove", e => this.onMove(e));
         window.addEventListener("pointerup", () => this.onUp());
 
+        // UI open/close.
+        this.uiToggleCheckbox = document.getElementById("ui-toggle");
+        this.uiToggleLabel = document.getElementById("ui-toggle-label");
+        this.uiToggleCheckbox.addEventListener("change", () => this.onUITogglePress());
+
         // UI input.
         this.bindSlider("pointerInteractionRadius");
         this.bindSlider("pointerInteractionStrength");
@@ -69,6 +74,14 @@ export default class InputHandler {
     }
 
     // -----------------------------------------------------------------------------
+    // UI open/close.
+    // -----------------------------------------------------------------------------
+
+    onUITogglePress() {
+        this.uiToggleLabel.textContent = this.uiToggleCheckbox.checked ? "CLOSE" : "OPEN";
+    }
+
+    // -----------------------------------------------------------------------------
     // UI input.
     // -----------------------------------------------------------------------------
 
@@ -85,7 +98,6 @@ export default class InputHandler {
             this.scene[sceneKey] = Number(slider.value);
             valueElement.textContent = slider.value;
 
-            // Rebuild the domain.
             if (triggersDomainRebuild) {
                 this.onDomainChange();
             }
@@ -94,7 +106,7 @@ export default class InputHandler {
 
     bindCheckbox(sceneKey) {
         let checkbox = document.getElementById(`${sceneKey}-toggle`);
-        if (!checkbox) return;
+
         checkbox.checked = !!this.scene[sceneKey];
         checkbox.addEventListener("input", () => {
             this.scene[sceneKey] = checkbox.checked;
@@ -103,7 +115,7 @@ export default class InputHandler {
 
     bindSelect(sceneKey) {
         let select = document.getElementById(`${sceneKey}-select`);
-        if (!select) return;
+
         select.value = this.scene[sceneKey];
         select.addEventListener("change", () => {
             this.scene[sceneKey] = select.value;

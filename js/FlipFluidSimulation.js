@@ -199,7 +199,7 @@ export default class FlipFluidSimulation {
         let positions = this.particlePositions;
         let velocities = this.particleVelocities;
 
-        // Simulation bounds (outermost layer of grid cells are walls).
+        // Simulation bounds (outermost layer of grid cells are solid walls).
         let minX = this.particleRadius + this.cellSize;
         let maxX = this.width - this.particleRadius - this.cellSize;
         let minY = this.particleRadius + this.cellSize;
@@ -729,7 +729,6 @@ export default class FlipFluidSimulation {
 
 
 
-
     // Linear helpers for custom gradients
     static _lerp(a, b, t) { return a + (b - a) * t; }
     static _lerp3(c0, c1, t) {
@@ -759,20 +758,10 @@ export default class FlipFluidSimulation {
         };
     }
 
-    /** A few ready-to-use maps */
+        /** A bunch of ready-to-use maps */
     static colourMaps = {
-        // Your existing "jet"-style rainbow
+        // Your existing ones
         rainbow: (t) => FlipFluidSimulation.rainbowColourMap(t),
-
-        // Perceptually nicer options:
-        // Rough Viridis-like (dark blue → green → yellow)
-        viridis: FlipFluidSimulation.makeGradient([
-            [0.00, [0.267, 0.005, 0.329]],
-            [0.25, [0.283, 0.141, 0.458]],
-            [0.50, [0.254, 0.265, 0.530]],
-            [0.75, [0.207, 0.372, 0.553]],
-            [1.00, [0.993, 0.906, 0.144]],
-        ]),
 
         // Fire (black → red → orange → yellow → white)
         fire: FlipFluidSimulation.makeGradient([
@@ -791,8 +780,35 @@ export default class FlipFluidSimulation {
             [1.00, [1.00, 1.00, 1.00]],
         ]),
 
-        // Greyscale (black → white)
+        // Greyscale
         greyscale: (t) => [t, t, t],
+
+        // --- New sequential maps ---
+
+        // Plasma-ish (purple → magenta → orange → yellow)
+        plasma: FlipFluidSimulation.makeGradient([
+            [0.00, [0.05, 0.00, 0.35]],
+            [0.25, [0.35, 0.00, 0.68]],
+            [0.50, [0.69, 0.13, 0.68]],
+            [0.75, [0.99, 0.57, 0.38]],
+            [1.00, [0.99, 0.90, 0.15]],
+        ]),
+
+        // Magma-ish (black → deep purple → red-orange → peach)
+        magma: FlipFluidSimulation.makeGradient([
+            [0.00, [0.00, 0.00, 0.00]],
+            [0.20, [0.10, 0.05, 0.20]],
+            [0.45, [0.38, 0.10, 0.40]],
+            [0.75, [0.82, 0.30, 0.20]],
+            [1.00, [0.99, 0.80, 0.60]],
+        ]),
+
+        // Coolwarm (blue → white → red)
+        coolwarm: FlipFluidSimulation.makeGradient([
+            [0.00, [0.23, 0.30, 0.75]],
+            [0.50, [0.95, 0.95, 0.95]],
+            [1.00, [0.80, 0.20, 0.19]],
+        ])
     };
 
 }
