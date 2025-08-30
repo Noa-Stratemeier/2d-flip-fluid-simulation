@@ -78,9 +78,9 @@ function initialiseScene() {
 
     // Match the canvas resolution to the simulation's domain size
     // before creating the WebGL2 context, so rendering coordinates
-    // align exactly with the simulation grid.
-    canvas.width = fluid.width;
-    canvas.height = fluid.height;
+    // align exactly (within 1 pixel) with the simulation grid.
+    canvas.width = Math.floor(fluid.width);
+    canvas.height = Math.floor(fluid.height);
     gl = canvas.getContext("webgl2");
 
     // Initialise particles.

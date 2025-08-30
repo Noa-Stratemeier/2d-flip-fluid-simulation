@@ -11,12 +11,13 @@
     </head>
 
     <body>
-        <div id="fps-counter">FPS: <span id="fps">0</span></div>
+        <div id="fps-counter"><span id="fps">0</span></div>
 
-        <input id="ui-toggle" type="checkbox" hidden>
-        <label for="ui-toggle" id="ui-toggle-label">OPEN</label>
+        <input id="ui-open-close" type="checkbox" hidden>
 
         <aside id="ui">
+            <label for="ui-open-close" id="ui-open-close-label">OPEN</label>
+
             <div id="inner-ui">
                 <div class="ui-folder">
                     <div class="ui-folder-name">Interaction</div>
@@ -58,6 +59,8 @@
                                 <option value="plasma">plasma</option>
                                 <option value="magma">magma</option>
                                 <option value="coolwarm">coolwarm</option>
+                                <option value="viridis">viridis</option>
+                                <option value="terrain">terrain</option>
                             </select>
                         </li>
                         <li class="ui-item">

@@ -27,7 +27,7 @@ export default class FlipFluidSimulation {
         this.cellCount = cellCountX * cellCountY;
 
         this.cellSize = cellSize;
-        this.halfCellSize = cellSize / 2.0;
+        this.halfCellSize = cellSize / 2.1;
         this.inverseCellSize = 1.0 / cellSize;
 
         this.cellType = new Int32Array(this.cellCount); 
@@ -705,27 +705,11 @@ export default class FlipFluidSimulation {
         return value + Math.sign(delta) * rate;
     }
 
-    /**
-     * Maps a value in [0, 1] to a rainbow colour (blue → cyan → green → yellow → red).
-     * Based on MATLAB-style "jet" colour map.
-     * 
-     * @param {number} t - Normalised value between 0.0 and 1.0.
-     * @returns {Array<number>} RGB colour in [0, 1].
-     */
-    static rainbowColourMap(t) {
-        let r = Math.min(Math.max(1.5 - Math.abs(4.0 * t - 3.0), 0.0), 1.0);
-        let g = Math.min(Math.max(1.5 - Math.abs(4.0 * t - 2.0), 0.0), 1.0);
-        let b = Math.min(Math.max(1.5 - Math.abs(4.0 * t - 1.0), 0.0), 1.0);
-
-        return [r, g, b];
-    }
 
 
 
 
-
-
-
+    
 
     // Linear helpers for custom gradients
     static _lerp(a, b, t) { return a + (b - a) * t; }
@@ -756,12 +740,19 @@ export default class FlipFluidSimulation {
         };
     }
 
-        /** A bunch of ready-to-use maps */
+    /** A bunch of ready-to-use maps */
     static colourMaps = {
-        // Your existing ones
-        jet: (t) => FlipFluidSimulation.rainbowColourMap(t),
+        // Jet (blue → cyan → green → yellow → red).
+        jet: FlipFluidSimulation.makeGradient([
+            [0.00,  [0.00, 0.00, 0.50]],
+            [0.125, [0.00, 0.00, 1.00]],
+            [0.375, [0.00, 1.00, 1.00]],
+            [0.625, [1.00, 1.00, 0.00]],
+            [0.875, [1.00, 0.00, 0.00]],
+            [1.00,  [0.50, 0.00, 0.00]],
+        ]),
 
-        // Fire (black → red → orange → yellow → white)
+        // Fire (black → red → orange → yellow → white).
         fire: FlipFluidSimulation.makeGradient([
             [0.00, [0.00, 0.00, 0.00]],
             [0.30, [0.50, 0.00, 0.00]],
@@ -770,7 +761,7 @@ export default class FlipFluidSimulation {
             [1.00, [1.00, 1.00, 1.00]],
         ]),
 
-        // Ice (navy → blue → cyan → white)
+        // Ice (navy → blue → cyan → white).
         ice: FlipFluidSimulation.makeGradient([
             [0.00, [0.02, 0.05, 0.25]],
             [0.35, [0.05, 0.20, 0.75]],
@@ -778,12 +769,10 @@ export default class FlipFluidSimulation {
             [1.00, [1.00, 1.00, 1.00]],
         ]),
 
-        // Greyscale
+        // Greyscale (black → white).
         greyscale: (t) => [t, t, t],
 
-        // --- New sequential maps ---
-
-        // Plasma-ish (purple → magenta → orange → yellow)
+        // Plasma (purple → magenta → orange → yellow).
         plasma: FlipFluidSimulation.makeGradient([
             [0.00, [0.05, 0.00, 0.35]],
             [0.25, [0.35, 0.00, 0.68]],
@@ -792,7 +781,7 @@ export default class FlipFluidSimulation {
             [1.00, [0.99, 0.90, 0.15]],
         ]),
 
-        // Magma-ish (black → deep purple → red-orange → peach)
+        // Magma (black → deep purple → red-orange → peach).
         magma: FlipFluidSimulation.makeGradient([
             [0.00, [0.00, 0.00, 0.00]],
             [0.20, [0.10, 0.05, 0.20]],
@@ -801,12 +790,31 @@ export default class FlipFluidSimulation {
             [1.00, [0.99, 0.80, 0.60]],
         ]),
 
-        // Coolwarm (blue → white → red)
+        // Coolwarm (blue → white → red).
         coolwarm: FlipFluidSimulation.makeGradient([
             [0.00, [0.23, 0.30, 0.75]],
             [0.50, [0.95, 0.95, 0.95]],
             [1.00, [0.80, 0.20, 0.19]],
+        ]),
+
+        // Viridis (dark blue → green → yellow).
+        viridis: FlipFluidSimulation.makeGradient([
+            [0.00, [0.267, 0.005, 0.329]],
+            [0.15, [0.283, 0.141, 0.458]],
+            [0.35, [0.254, 0.265, 0.530]],
+            [0.55, [0.164, 0.471, 0.558]],
+            [0.75, [0.128, 0.566, 0.551]],
+            [1.00, [0.993, 0.906, 0.144]],
+        ]),
+
+        // Terrain (deep water → shallow → sand → grass → dense forest).
+        terrain: FlipFluidSimulation.makeGradient([
+            [0.00, [0.01, 0.09, 0.30]],
+            [0.12, [0.00, 0.45, 0.60]],
+            [0.20, [0.90, 0.84, 0.60]],
+            [0.35, [0.40, 0.70, 0.30]],
+            [0.55, [0.10, 0.45, 0.15]],
+            [1.00, [0.00, 0.20, 0.00]],
         ])
     };
-
 }

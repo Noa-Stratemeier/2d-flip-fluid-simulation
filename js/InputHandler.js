@@ -14,9 +14,10 @@ export default class InputHandler {
         window.addEventListener("pointerup", () => this.onUp());
 
         // UI open/close.
-        this.uiToggleCheckbox = document.getElementById("ui-toggle");
-        this.uiToggleLabel = document.getElementById("ui-toggle-label");
-        this.uiToggleCheckbox.addEventListener("change", () => this.onUITogglePress());
+        this.uiOpenCloseCheckbox = document.getElementById("ui-open-close");
+        this.uiOpenCloseLabel = document.getElementById("ui-open-close-label");
+        this.uiElement = document.getElementById("ui");
+        this.uiOpenCloseCheckbox.addEventListener("change", () => this.onUIOpenClosePress());
 
         // UI input.
         this.bindSlider("pointerInteractionRadius");
@@ -77,8 +78,18 @@ export default class InputHandler {
     // UI open/close.
     // -----------------------------------------------------------------------------
 
-    onUITogglePress() {
-        this.uiToggleLabel.textContent = this.uiToggleCheckbox.checked ? "CLOSE" : "OPEN";
+    onUIOpenClosePress() {
+        this.uiElement.classList.remove("animation-open", "animation-close");
+
+        if (this.uiOpenCloseCheckbox.checked) {
+            this.uiOpenCloseLabel.textContent = "CLOSE";
+            this.uiOpenCloseLabel.classList.add("open");
+            this.uiElement.classList.add("animation-open");
+        } else {
+            this.uiOpenCloseLabel.textContent = "OPEN";
+            this.uiOpenCloseLabel.classList.remove("open");
+            this.uiElement.classList.add("animation-close");
+        }
     }
 
     // -----------------------------------------------------------------------------
