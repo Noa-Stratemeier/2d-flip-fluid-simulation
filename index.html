@@ -37,17 +37,17 @@
                 <div class="ui-folder">
                     <div class="ui-folder-name">Rendering</div>
                     <ul class="ui-folder-list">
-                        <li class="ui-item ui-toggle-item">
-                            <label class="ui-toggle-btn" for="colourLowDensityParticles-toggle">
-                                colour by density
-                                <input id="colourLowDensityParticles-toggle" type="checkbox">
-                            </label>
+                        <li class="ui-item">
+                            <label for="colourLowDensityParticles-checkbox">colour by density</label>
+                            <input id="colourLowDensityParticles-checkbox" type="checkbox" hidden>
                         </li>
-                        <li class="ui-item ui-toggle-item">
-                            <label class="ui-toggle-btn" for="colourParticlesBySpeed-toggle">
-                                colour by speed
-                                <input id="colourParticlesBySpeed-toggle" type="checkbox">
-                            </label>
+                        <li class="ui-item">
+                            <label for="colourParticlesBySpeed-checkbox">colour by speed</label>
+                            <input id="colourParticlesBySpeed-checkbox" type="checkbox" hidden>
+                        </li>
+                        <li class="ui-item">
+                            <label for="lowDensityColour-input">low density colour</label>
+                            <input id="lowDensityColour-input" type="color">
                         </li>
                         <li class="ui-item">
                             <label for="speedColourMap-select">speed colour map</label>
@@ -62,6 +62,10 @@
                                 <option value="viridis">viridis</option>
                                 <option value="terrain">terrain</option>
                             </select>
+                        </li>
+                        <li class="ui-item">
+                            <label for="baseColour-input">base colour</label>
+                            <input id="baseColour-input" type="color">
                         </li>
                         <li class="ui-item">
                             <label for="particleDisplaySize-slider">particle scale</label> 

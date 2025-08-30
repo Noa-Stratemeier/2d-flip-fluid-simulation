@@ -1,6 +1,8 @@
 TODO:
 PRIORITY:
+- Small screen styles.
 - Make a display for particle count.
+- Stiffness 0 projection 0 separation 1 causes extreme lag.
 
 
 GENERAL:
@@ -23,4 +25,5 @@ BUGS:
 
 
 NTH:
-- Make low density colour particles fade into the speed colour when both are active.
+- Make low density colour particles fade into the speed colour slower when both are active.
+- Make fluid width/height a percentage in the UI.

@@ -27,6 +27,8 @@ export default class InputHandler {
         this.bindCheckbox("colourParticlesBySpeed");
         this.bindSelect("speedColourMap");
         this.bindSlider("particleDisplaySize");
+        this.bindColor("baseColour");
+        this.bindColor("lowDensityColour");
 
         this.bindSlider("gravity");
         this.bindSlider("dt");
@@ -116,7 +118,7 @@ export default class InputHandler {
     }
 
     bindCheckbox(sceneKey) {
-        let checkbox = document.getElementById(`${sceneKey}-toggle`);
+        let checkbox = document.getElementById(`${sceneKey}-checkbox`);
 
         checkbox.checked = !!this.scene[sceneKey];
         checkbox.addEventListener("input", () => {
@@ -132,4 +134,26 @@ export default class InputHandler {
             this.scene[sceneKey] = select.value;
         });
     }
+
+    bindColor(sceneKey) {
+        const input = document.getElementById(`${sceneKey}-input`);
+        // Convert initial RGB array to hex
+        input.value = rgbArrayToHex(this.scene[sceneKey]);
+        input.addEventListener("input", () => {
+            this.scene[sceneKey] = hexToRgbArray(input.value);
+        });
+    }  
+}
+
+// Utility functions
+function rgbArrayToHex(arr) {
+    return "#" + arr.map(x => Math.round(x * 255).toString(16).padStart(2, "0")).join("");
+}
+function hexToRgbArray(hex) {
+    hex = hex.replace("#", "");
+    return [
+        parseInt(hex.substring(0,2), 16) / 255,
+        parseInt(hex.substring(2,4), 16) / 255,
+        parseInt(hex.substring(4,6), 16) / 255
+    ];
 }

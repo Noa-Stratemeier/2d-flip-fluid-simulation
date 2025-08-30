@@ -326,7 +326,7 @@ body {
     right: 0;
     width: 600px;
     height: 100vh;
-    padding: 40px;
+    padding: 60px 80px;
     box-sizing: border-box;
     display: flex;
     justify-content: center;
@@ -354,8 +354,13 @@ body {
     animation: ui-close 1000ms ease forwards; 
 }
 
+#inner-ui {
+    display: flex;
+    flex-direction: column;
+    row-gap: 40px;
+}
+
 .ui-folder-name {
-    margin-top: 40px;
     margin-bottom: 10px;
     font-size: large;
     letter-spacing: 1px;
@@ -373,165 +378,152 @@ body {
     height: 1px;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 .ui-folder-list {
     display: grid;
-    width: 100%;
-    grid-template-columns: repeat(2, minmax(100px, 1fr));
+    grid-template-columns: 1fr 1fr;
     gap: 20px 40px;
-    list-style: none;
-    margin: 0;
     padding: 0;
+    margin: 0;
+    list-style: none; 
 }
-
 
 .ui-item {
     display: grid;
-    width: 100%;
-    grid-template-rows: auto auto;
-    grid-template-areas:
-        "label value"
-        "slider slider";
-    align-items: center;
-    gap: 4px 8px;
+    grid-template-columns: auto auto;
+    grid-template-areas: "label value" "slider slider";
+    gap: 12px 8px;
 }
 
 .ui-item label { 
     grid-area: label; 
 }
+
 .ui-item span  { 
-    grid-area: value; 
-    justify-self: end; 
-    min-width: 3ch;
+    grid-area: value;
+    min-width: 4ch;
     text-align: right;
     color: grey;
     transition: color 0.1s linear 0s;
 }
+
 .ui-item input[type="range"] { 
     grid-area: slider; 
-    width: 100%; 
-}
-
-.ui-item:has(input[type="range"]:active) span, .ui-item:has(input[type="range"]:focus-visible) span { 
-    color: white; 
-}
-
-
-.ui-item input[type="range"] {
+    width: 100%;
     accent-color: rgb(255, 255, 255);
     height: 5px;
-    margin-top: 10px;
+    cursor: pointer;
 }
-
-
-
-
-
-
+.ui-item:has(input[type="range"]:is(:active, :focus-visible)) span { 
+    color: white;
+}
 
 .ui-item select {
     grid-area: slider;
-    width: 100%;
-    padding: 6px 10px;
-    font-family: inherit;
-    font-size: 1em;
-    background: #222;
-    color: white;
-    border: 1px solid #444;
-    border-radius: 4px;
-    outline: none;
-    transition: border-color 0.2s;
-    margin-top: 10px;
-    box-sizing: border-box;
-}
-
-.ui-item select:focus, .ui-item select:hover {
-    border-color: white;
-}
-
-
-.ui-item select {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
+    padding: 6px 10px;
+    font-family: inherit;
+    background: #222;
+    color: white;
+    border: 1px solid #444;
+    outline: none;
+    transition: border-color ease 0.2s;
     background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='16' viewBox='0 0 24 24' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
     background-repeat: no-repeat;
-    background-position: right 10px center;
+    background-position: right 6px center;
     background-size: 16px 16px;
-    padding-right: 32px;
+}
+.ui-item select:is(:hover, :focus, :focus-visible) {
+    border-color: white;
+    cursor: pointer;
 }
 
 
-
-
-
-
-
-
-
-
-
-.ui-toggle-item {
-    display: block;
+.ui-item:has(input[type="checkbox"]) {
     grid-template-columns: 1fr;
     grid-template-areas: "slider";
 }
-
-.ui-toggle-btn {
-    display: block;
+.ui-item:has(input[type="checkbox"]) label {
+    grid-area: slider;
     width: 100%;
-    padding: 4px 0;
+    padding: 6px 0;
     background: #222;
-    color: white;
     font-weight: bold;
     text-align: center;
-    border: 2px solid #444;
-    border-radius: 8px;
+    border: 1px solid #444;
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, color 0.2s;
-    position: relative;
+    transition: ease 0.2s;
     user-select: none;
 }
-
-.ui-toggle-btn input[type="checkbox"] {
-    display: none;
-}
-
-.ui-toggle-btn:has(input[type="checkbox"]:checked) {
+.ui-item:has(input[type="checkbox"]:checked) label {
     background: #e6e6e6;
-    color: #000000;
+    color: #070707;
 }
-
-.ui-toggle-btn:active,
-.ui-toggle-btn:hover {
+.ui-item:has(input[type="checkbox"]) label:hover {
     border-color: white;
-    background: #333;
 }
 
 
+
+
+
+/* Color inputs */
+.ui-item input[type="color"] {
+    grid-area: slider;
+    width: 100%;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #444;
+    border-radius: 6px;
+    background: #222;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    transition: border-color .2s ease, box-shadow .2s ease;
+}
+.ui-item input[type="color"]:is(:hover, :focus-visible) {
+    border-color: #fff;
+    box-shadow: 0 0 0 3px rgba(255,255,255,.08);
+}
+
+/* Make the inner swatch flush + rounded (Chrome/Edge/Safari) */
+.ui-item input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.ui-item input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+
+/* Firefox */
+.ui-item input[type="color"]::-moz-color-swatch { border: none; border-radius: 6px; }
+
+
+
+
+
+
+
+
+
+
+/* Small screens */
+@media (max-width: 640px) {
+
+    #ui {
+        width: 80vw;
+        padding: 40px;
+    }
+
+    /* Stack controls and tighten spacing */
+    #inner-ui { 
+        row-gap: 10px;
+    }
+    .ui-folder-list { 
+        gap: 5px 12px; 
+    }
+    .ui-item { 
+        gap: 10px 8px; 
+    }
+    .ui-item:has(input[type="checkbox"]) label {
+        place-self: center;
+        text-align: center;
+    }
+}
