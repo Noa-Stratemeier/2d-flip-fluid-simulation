@@ -136,11 +136,16 @@ export default class InputHandler {
     }
 
     bindColor(sceneKey) {
-        const input = document.getElementById(`${sceneKey}-input`);
+        let colourPicker = document.getElementById(`${sceneKey}-input`);
+        let valueElement = document.getElementById(`${sceneKey}-value`);
+
         // Convert initial RGB array to hex
-        input.value = rgbArrayToHex(this.scene[sceneKey]);
-        input.addEventListener("input", () => {
-            this.scene[sceneKey] = hexToRgbArray(input.value);
+        colourPicker.value = rgbArrayToHex(this.scene[sceneKey]);
+        valueElement.textContent = rgbArrayToHex(this.scene[sceneKey]);
+
+        colourPicker.addEventListener("input", () => {
+            this.scene[sceneKey] = hexToRgbArray(colourPicker.value);
+            valueElement.textContent = colourPicker.value;
         });
     }  
 }
