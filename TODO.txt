@@ -1,7 +1,6 @@
 TODO:
 PRIORITY:
 - Make a display for particle count.
-- Add pause and step simulation (maybe on fluid width/height change start the simulation paused).
 
 
 GENERAL:
@@ -14,16 +13,13 @@ PERFORMANCE:
 
 
 CODE REFACTORING:
--
+- Move colour maps to a different place.
 
 
 BUGS:
-- Rotating the screen to landscape on mobile devices breaks simulation (I think this happens when the Y-cells (resolution) makes the cell width smaller than or equal to 1 pixel).
-- Particle scale slider sometimes gets stuck with cursor as red circle with diagonal cross through it (happens when something is selected (like text), then when dragging the computer thinks you are copying the selected thing somewhere).
 - When you turn off all particle separating forces, and force all particles into the exact same position (so all particles are exactly overlapping), then the simulation cannot recover (since overlaps aren't resolved for completely overlapping particles).
 - Stiffness 0 projection 0 separation 1 causes extreme lag.
 
 NTH:
+- Currently changing the width/height of the fluid while paused and with colour by speed selected causes flashing. Fix this.
 - Make low density colour particles fade into the speed colour slower when both are active.
-- Make fluid width/height a percentage in the UI (also display units next to other controls).
-- Display hex colours next to base and low density colour.

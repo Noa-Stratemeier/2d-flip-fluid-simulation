@@ -27,7 +27,7 @@ export default class FlipFluidSimulation {
         this.cellCount = cellCountX * cellCountY;
 
         this.cellSize = cellSize;
-        this.halfCellSize = cellSize / 2.1;
+        this.halfCellSize = cellSize / 2.0;
         this.inverseCellSize = 1.0 / cellSize;
 
         this.cellType = new Int32Array(this.cellCount); 
@@ -398,19 +398,17 @@ export default class FlipFluidSimulation {
                 let weightSum = w1Valid + w2Valid + w3Valid + w4Valid;
                 if (weightSum > 0.0) {
                     let weightedVelocitySum = w1Valid * velocityGrid[i1] + w2Valid * velocityGrid[i2] + w3Valid * velocityGrid[i3] + w4Valid * velocityGrid[i4];
-                    let weightedDeltaSum = 
+                    let weightedDeltaVelocitySum = 
                         w1Valid * (velocityGrid[i1] - velocityGridPrevious[i1]) + 
                         w2Valid * (velocityGrid[i2] - velocityGridPrevious[i2]) + 
                         w3Valid * (velocityGrid[i3] - velocityGridPrevious[i3]) + 
                         w4Valid * (velocityGrid[i4] - velocityGridPrevious[i4]);
 
                     let picVelocity = weightedVelocitySum / weightSum;
-                    let flipVelocity = v + (weightedDeltaSum / weightSum);
+                    let flipVelocity = v + (weightedDeltaVelocitySum / weightSum);
 
                     velocities[xi + component] = (1.0 - flipRatio) * picVelocity + flipRatio * flipVelocity;
-
-                }
-                
+                }  
             }
         }
     }
@@ -648,7 +646,7 @@ export default class FlipFluidSimulation {
             let bi = 3 * i + 2;
 
             // Fade speeds for the different colours.
-            let baseColourFade = 0.005;
+            let baseColourFade = 0.01;
             let lowDensityColourFade = 1.0;
             let particleSpeedColourFade = 0.05;
 
@@ -705,12 +703,6 @@ export default class FlipFluidSimulation {
         return value + Math.sign(delta) * rate;
     }
 
-
-
-
-
-    
-
     // Linear helpers for custom gradients
     static _lerp(a, b, t) { return a + (b - a) * t; }
     static _lerp3(c0, c1, t) {
@@ -740,7 +732,9 @@ export default class FlipFluidSimulation {
         };
     }
 
-    /** A bunch of ready-to-use maps */
+    /** 
+     * Ready-to-use colour maps.
+     */
     static colourMaps = {
         // Jet (blue → cyan → green → yellow → red).
         jet: FlipFluidSimulation.makeGradient([
@@ -815,6 +809,15 @@ export default class FlipFluidSimulation {
             [0.35, [0.40, 0.70, 0.30]],
             [0.55, [0.10, 0.45, 0.15]],
             [1.00, [0.00, 0.20, 0.00]],
+        ]),
+
+        // Ocean (deep blue → light turquoise).
+        ocean: FlipFluidSimulation.makeGradient([
+            [0.00, [0.00, 0.08, 0.15]],
+            [0.25, [0.00, 0.22, 0.35]],
+            [0.50, [0.00, 0.45, 0.55]],
+            [0.70, [0.15, 0.75, 0.65]],
+            [1.00, [0.70, 0.95, 0.85]]
         ])
     };
 }

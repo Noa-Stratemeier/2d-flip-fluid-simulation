@@ -4,6 +4,13 @@ export default class InputHandler {
         this.scene = scene;
         this.onDomainChange = onDomainChange;
 
+        // Keyboard controls.
+        this.isPaused = false;
+        this.stepThisFrame = false;
+
+        window.addEventListener("keyup", (e) => {if (e.key === 'p' || e.key === 'P') this.isPaused = !this.isPaused;});
+        window.addEventListener("keydown", (e) => {if ((e.key === 's' || e.key === 'S') && this.isPaused) this.stepThisFrame = true;});
+
         // Pointer input.
         this.isPointerDown = false;
         this.pointerX = 0;

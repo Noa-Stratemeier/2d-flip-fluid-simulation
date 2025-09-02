@@ -10,32 +10,32 @@ let scene = {
     pointerInteractionRadius: Math.round(Math.min(window.innerWidth * 0.1, window.innerHeight * 0.1)),
     pointerInteractionStrength: 1000,
 
-    // Display.
+    // Rendering.
     colourLowDensityParticles: true,
     baseColour: [0.0, 0.0, 1.0],
     lowDensityColour: [1.0, 1.0, 1.0],
 
     colourParticlesBySpeed: true,
-    speedColourMap: "plasma",  // 'jet' | 'fire' | 'ice' | 'greyscale' | 'plasma' | 'magma' | 'coolwarm'.
+    speedColourMap: "ocean",  // 'jet' | 'fire' | 'ice' | 'greyscale' | 'ocean' | 'plasma' | 'magma' | 'coolwarm'.
 
     particleDisplaySize: 1.75,
 
     // Tank.
     tankWidth: window.innerWidth,
     tankHeight: window.innerHeight,
-    resolution: 80,
+    resolution: 90,
 
     // Fluid.
     relativeFluidWidth: 0.6,
     relativeFluidHeight: 0.8,
 
     // Simulation.
-    gravity: -1170,  // In pixels per second squared.
+    gravity: -1200,  // In pixels per second squared.
     dt: 0.0167,
     flipRatio: 0.95,
     projectionIterations: 50,
     particleSeparationIterations: 1,
-    overRelaxation: 1.5,
+    overRelaxation: 1.25,
     stiffness: 250.0,
 
     flipFluidSimulation: null,
@@ -126,15 +126,23 @@ function initialiseScene() {
 function animate() {
     fpsCounter.tick();
 
-    scene.flipFluidSimulation.stepSimulation(
-        scene.dt, 
-        scene.gravity,
-        scene.flipRatio, 
-        scene.overRelaxation, 
-        scene.particleSeparationIterations, 
-        scene.projectionIterations, 
-        scene.stiffness
-    );
+    if (!input.isPaused || input.stepThisFrame) {
+        // Step simulation.
+        scene.flipFluidSimulation.stepSimulation(
+            scene.dt, 
+            scene.gravity,
+            scene.flipRatio, 
+            scene.overRelaxation, 
+            scene.particleSeparationIterations, 
+            scene.projectionIterations, 
+            scene.stiffness
+        );
+
+        // Apply user pointer interaction.
+        if (input.isPointerDown) scene.flipFluidSimulation.repelParticles(input.pointerX, input.pointerY, scene.pointerInteractionRadius, scene.pointerInteractionStrength);
+
+        input.stepThisFrame = false;
+    }
 
     // Update particle colours.
     scene.flipFluidSimulation.updateParticleColours(
@@ -144,9 +152,6 @@ function animate() {
         scene.colourParticlesBySpeed,
         FlipFluidSimulation.colourMaps[scene.speedColourMap]
     );
-
-    // Apply user pointer interaction.
-    if (input.isPointerDown) scene.flipFluidSimulation.repelParticles(input.pointerX, input.pointerY, scene.pointerInteractionRadius, scene.pointerInteractionStrength);
 
     render.draw(gl, scene.flipFluidSimulation, scene.particleDisplaySize);
 
