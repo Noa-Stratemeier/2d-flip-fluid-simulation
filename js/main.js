@@ -99,15 +99,18 @@ function initialiseScene() {
     }
 
     // Initialise particle colours.
-    for (let i = 0; i < particleCount; i++) {
-        let ri = i * 3;
-        let gi = i * 3 + 1;
-        let bi = i * 3 + 2;
-
-        fluid.particleColours[ri] = scene.baseColour[0];
-        fluid.particleColours[gi] = scene.baseColour[1];
-        fluid.particleColours[bi] = scene.baseColour[2];
-    }
+    let baseColourFade, lowDensityColourFade, particleSpeedColourFade;
+    baseColourFade = lowDensityColourFade = particleSpeedColourFade = 1.0;  // Instantly set particles to their desired colour on setup.
+    scene.flipFluidSimulation.updateParticleColours(
+        scene.baseColour,
+        scene.lowDensityColour,
+        scene.colourLowDensityParticles,
+        scene.colourParticlesBySpeed,
+        FlipFluidSimulation.colourMaps[scene.speedColourMap],
+        baseColourFade,
+        lowDensityColourFade,
+        particleSpeedColourFade,
+    );
 
     // Initialise solid cells.
     for (let gridX = 0; gridX < cellCountX; gridX++) {

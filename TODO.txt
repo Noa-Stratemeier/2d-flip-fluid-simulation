@@ -21,5 +21,4 @@ BUGS:
 - Stiffness 0 projection 0 separation 1 causes extreme lag.
 
 NTH:
-- Currently changing the width/height of the fluid while paused and with colour by speed selected causes flashing. Fix this.
 - Make low density colour particles fade into the speed colour slower when both are active.

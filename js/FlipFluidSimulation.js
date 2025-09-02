@@ -624,7 +624,16 @@ export default class FlipFluidSimulation {
      * @param {boolean} colourParticlesBySpeed - Enable speed-based colouring.
      * @param {function} speedColourMap - Function mapping normalised speed (0-1) to RGB colour.
      */
-    updateParticleColours(baseColour, lowDensityColour, colourLowDensityParticles, colourParticlesBySpeed, speedColourMap) {
+    updateParticleColours(
+        baseColour, 
+        lowDensityColour, 
+        colourLowDensityParticles, 
+        colourParticlesBySpeed, 
+        speedColourMap, 
+        baseColourFade = 0.01, 
+        lowDensityColourFade = 1.0, 
+        particleSpeedColourFade = 0.05,
+    ) {
         let positions = this.particlePositions;
         let velocities = this.particleVelocities;
         let colours = this.particleColours;
@@ -644,11 +653,6 @@ export default class FlipFluidSimulation {
             let ri = 3 * i;
             let gi = 3 * i + 1;
             let bi = 3 * i + 2;
-
-            // Fade speeds for the different colours.
-            let baseColourFade = 0.01;
-            let lowDensityColourFade = 1.0;
-            let particleSpeedColourFade = 0.05;
 
             // Default to base colour and fade speed.
             let targetColour = baseColour;
