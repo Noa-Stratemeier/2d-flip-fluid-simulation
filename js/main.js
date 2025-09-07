@@ -30,7 +30,7 @@ let scene = {
     relativeFluidHeight: 0.8,
 
     // Simulation.
-    gravity: -1200,  // In pixels per second squared.
+    gravity: 1200,  // In pixels per second squared.
     dt: 0.0167,
     flipRatio: 0.95,
     projectionIterations: 50,
@@ -133,7 +133,7 @@ function animate() {
         // Step simulation.
         scene.flipFluidSimulation.stepSimulation(
             scene.dt, 
-            scene.gravity,
+            -scene.gravity,
             scene.flipRatio, 
             scene.overRelaxation, 
             scene.particleSeparationIterations, 

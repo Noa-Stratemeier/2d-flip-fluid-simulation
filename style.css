@@ -38,12 +38,15 @@ body {
 #ui-open-close-label {
     position: absolute;
     text-align: right;
-    top: 100px;
+    top: 150px;
     right: 100%;
-    width: 55px;
+    width: 65px;
     padding: 5px;
     margin-right: 20px;
+    font-size: large;
     cursor: pointer;
+    transition: letter-spacing 0.2s ease;
+    letter-spacing: 0;
 }
 #ui-open-close-label::after {
     content: "";
@@ -56,10 +59,6 @@ body {
     pointer-events: none;
 }
 
-#ui-open-close-label {
-    transition: letter-spacing 0.2s ease;
-    letter-spacing: 0;
-}
 #ui-open-close-label.open {
     letter-spacing: 4px;
 }
@@ -100,10 +99,10 @@ body {
     100% { transform: translateX(100%); }
 }
 #ui.animation-open { 
-    animation: ui-open 1000ms ease forwards; 
+    animation: ui-open 600ms ease forwards; 
 }
 #ui.animation-close { 
-    animation: ui-close 1000ms ease forwards; 
+    animation: ui-close 600ms ease forwards; 
 }
 
 /* UI controls panel. */
@@ -273,7 +272,7 @@ body {
 /* Small Screen Styles.
 /* ----------------------------------------------------------------------------- */
 
-@media (max-width: 700px) {
+@media (max-width: 750px) {
     .ui-folder-list { 
         grid-template-columns: 1fr; 
     }
