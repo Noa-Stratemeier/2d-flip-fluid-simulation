@@ -181,7 +181,6 @@ export default class FlipFluidSimulation {
 
                                 positions[xi] -= ndx * overlap;
                                 positions[yi] -= ndy * overlap;
-
                                 positions[xiNeighbour] += ndx * overlap;
                                 positions[yiNeighbour] += ndy * overlap;
                             }
@@ -710,7 +709,9 @@ export default class FlipFluidSimulation {
         return value + Math.sign(delta) * rate;
     }
 
-    // Linear helpers for custom gradients
+    /**
+     * Linear helpers for custom gradients.
+     */
     static _lerp(a, b, t) { return a + (b - a) * t; }
     static _lerp3(c0, c1, t) {
         return [

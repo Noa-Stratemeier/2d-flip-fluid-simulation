@@ -11,7 +11,10 @@
     </head>
 
     <body>
-        <div id="fps-counter"><span id="fps">0</span></div>
+        <div id="fps-particle-counters" onclick="this.firstElementChild.hidden=!this.firstElementChild.hidden;this.lastElementChild.hidden=!this.lastElementChild.hidden;">
+            <div id="fps-counter"><span id="fps">0</span> fps</div>
+            <div id="particle-counter" hidden><span id="particle-count">0</span> particles</div>
+        </div>
 
         <input id="ui-open-close" type="checkbox" hidden>
 
@@ -99,7 +102,7 @@
                             <input id="dt-slider" type="range" min="0.0002" max="0.02" step="0.0001">
                         </li>
                         <li class="ui-item">
-                            <label class="pointer-events-none" for="flipRatio-slider">Fluidity</label> 
+                            <label class="pointer-events-none" for="flipRatio-slider">Splashiness</label> 
                             <span id="flipRatio-value"></span>
                             <input id="flipRatio-slider" type="range" min="0" max="1" step="0.05">
                         </li>
@@ -131,7 +134,7 @@
                         <li class="ui-item">
                             <label class="pointer-events-none" for="relativeFluidWidth-slider">Fluid Width</label> 
                             <span id="relativeFluidWidth-value"></span>
-                            <input id="relativeFluidWidth-slider" type="range" min="0.1" max="1.0" step="0.05">
+                            <input id="relativeFluidWidth-slider" type="range" min="0.25" max="1.0" step="0.05">
                         </li>
                         <li class="ui-item">
                             <label class="pointer-events-none" for="relativeFluidHeight-slider">Fluid Height</label> 

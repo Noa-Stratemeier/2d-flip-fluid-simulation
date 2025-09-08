@@ -69,9 +69,13 @@ function initialiseScene() {
     let simulationWidth = cellCountX * cellSize;
     let simulationHeight = cellCountY * cellSize;
 
-    let particleCountX = Math.floor((scene.relativeFluidWidth * simulationWidth - 2.0 * cellSize - 2.0 * particleRadius) / particleSpacingX);
-	let particleCountY = Math.floor((scene.relativeFluidHeight * simulationHeight - 2.0 * cellSize - 2.0 * particleRadius) / particleSpacingY);
+    let particleCountX = Math.max(0, Math.floor((scene.relativeFluidWidth * simulationWidth - 2.0 * cellSize - 2.0 * particleRadius) / particleSpacingX));
+	let particleCountY = Math.max(0, Math.floor((scene.relativeFluidHeight * simulationHeight - 2.0 * cellSize - 2.0 * particleRadius) / particleSpacingY));
 	let particleCount = particleCountX * particleCountY;
+
+    // Update particle counter.
+    let particleCountElement = document.getElementById("particle-count");
+    particleCountElement.textContent = particleCount.toLocaleString();
     
     // Create simulation.
     let fluid = scene.flipFluidSimulation = new FlipFluidSimulation(particleCount, particleRadius, cellCountX, cellCountY, cellSize);

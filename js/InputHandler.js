@@ -146,7 +146,7 @@ export default class InputHandler {
         let colourPicker = document.getElementById(`${sceneKey}-input`);
         let valueElement = document.getElementById(`${sceneKey}-value`);
 
-        // Convert initial RGB array to hex
+        // Convert initial RGB array to hex.
         colourPicker.value = rgbArrayToHex(this.scene[sceneKey]);
         valueElement.textContent = rgbArrayToHex(this.scene[sceneKey]);
 
@@ -157,7 +157,7 @@ export default class InputHandler {
     }  
 }
 
-// Utility functions
+// Utility functions.
 function rgbArrayToHex(arr) {
     return "#" + arr.map(x => Math.round(x * 255).toString(16).padStart(2, "0")).join("");
 }
