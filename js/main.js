@@ -23,7 +23,7 @@ let scene = {
     // Tank.
     tankWidth: window.innerWidth,
     tankHeight: window.innerHeight,
-    resolution: 90,
+    resolution: 60,
 
     // Fluid.
     relativeFluidWidth: 0.6,

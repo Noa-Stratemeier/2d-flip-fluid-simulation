@@ -729,10 +729,10 @@ export default class FlipFluidSimulation {
         return (t) => {
             t = Math.min(1, Math.max(0, t));
             for (let i = 1; i < stops.length; i++) {
-                const [t1, c1] = stops[i];
-                const [t0, c0] = stops[i - 1];
+                let [t1, c1] = stops[i];
+                let [t0, c0] = stops[i - 1];
                 if (t <= t1) {
-                    const u = (t - t0) / Math.max(1e-8, (t1 - t0));
+                    let u = (t - t0) / Math.max(1e-8, (t1 - t0));
                     return FlipFluidSimulation._lerp3(c0, c1, u);
                 }
             }
