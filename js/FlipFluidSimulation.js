@@ -837,7 +837,7 @@ export default class FlipFluidSimulation {
             [1.00, [1.00, 0.90, 0.88]],
         ]),
 
-        // Frog (deep green - light green).
+        // Frog (deep green → light green).
         frog: FlipFluidSimulation.makeGradient([
             [0.00, [0.02, 0.06, 0.02]],
             [0.20, [0.06, 0.20, 0.06]],
