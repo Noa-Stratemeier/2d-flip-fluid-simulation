@@ -2,7 +2,10 @@
 
 A realtime Fluid Implicit Particle (FLIP) Simulation in 2D. 
 
-Demo: [Try it here](https://noa-stratemeier.github.io/2d-flip-fluid-simulation/)
+## Demo
+[Try it here](https://noa-stratemeier.github.io/2d-flip-fluid-simulation/)
+
+https://github.com/user-attachments/assets/a7d9465f-a231-4c6e-bd20-a38dcc10448f
 
 ## References
 
