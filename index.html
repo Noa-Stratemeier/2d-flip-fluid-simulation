@@ -1,158 +1,161 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="author" content="Noa Stratemeier">
-        <meta name="description" content="A real-time interactive 2D FLIP fluid simulation in WebGL, featuring adjustable physics and rendering controls.">
-        <title>2D FLIP Fluid Simulation</title>
-        <link rel="stylesheet" href="style.css">
-        <script type="module" src="js/main.js"></script>
-    </head>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="author" content="Noa Stratemeier" />
+    <meta name="description" content="A real-time interactive 2D FLIP fluid simulation in WebGL, featuring adjustable physics and rendering controls." />
+    <title>2D FLIP Fluid Simulation</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="js/main.js"></script>
+  </head>
 
-    <body>
-        <div id="fps-particle-counters" onclick="this.firstElementChild.hidden=!this.firstElementChild.hidden;this.lastElementChild.hidden=!this.lastElementChild.hidden;">
-            <div id="fps-counter"><span id="fps">0</span> fps</div>
-            <div id="particle-counter" hidden><span id="particle-count">0</span> particles</div>
+  <body>
+    <div
+      id="fps-particle-counters"
+      onclick="this.firstElementChild.hidden=!this.firstElementChild.hidden;this.lastElementChild.hidden=!this.lastElementChild.hidden;"
+    >
+      <div id="fps-counter"><span id="fps">0</span> fps</div>
+      <div id="particle-counter" hidden><span id="particle-count">0</span> particles</div>
+    </div>
+
+    <input id="ui-open-close" type="checkbox" hidden />
+
+    <aside id="ui">
+      <label for="ui-open-close" id="ui-open-close-label">OPEN</label>
+
+      <div id="inner-ui">
+        <div class="ui-folder">
+          <div class="ui-folder-name">Rendering</div>
+          <ul class="ui-folder-list">
+            <li class="ui-item">
+              <label for="colourLowDensityParticles-checkbox">Colour by Density</label>
+              <input id="colourLowDensityParticles-checkbox" type="checkbox" hidden />
+            </li>
+            <li class="ui-item">
+              <label for="colourParticlesBySpeed-checkbox">Colour by Speed</label>
+              <input id="colourParticlesBySpeed-checkbox" type="checkbox" hidden />
+            </li>
+            <li class="ui-item">
+              <label class="value-colour-box-label pointer-events-none" for="lowDensityColour-input">Low Density Colour</label>
+              <label class="value-colour-box" for="lowDensityColour-input" aria-hidden="true">
+                <span id="lowDensityColour-value"></span>
+                <input id="lowDensityColour-input" type="color" />
+              </label>
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="speedColourMap-select">Speed Colour Map</label>
+              <select id="speedColourMap-select">
+                <optgroup label="ARTISTIC">
+                  <option value="fire">fire</option>
+                  <option value="ice">ice</option>
+                  <option value="greyscale">greyscale</option>
+                  <option value="terrain">terrain</option>
+                  <option value="ocean">ocean</option>
+                  <option value="flamingo">flamingo</option>
+                  <option value="frog">frog</option>
+                </optgroup>
+                <optgroup label="SCIENTIFIC">
+                  <option value="jet">jet</option>
+                  <option value="plasma">plasma</option>
+                  <option value="magma">magma</option>
+                  <option value="coolwarm">coolwarm</option>
+                  <option value="viridis">viridis</option>
+                </optgroup>
+              </select>
+            </li>
+            <li class="ui-item">
+              <label class="value-colour-box-label pointer-events-none" for="baseColour-input">Base Colour</label>
+              <label class="value-colour-box" for="baseColour-input" aria-hidden="true">
+                <span id="baseColour-value"></span>
+                <input id="baseColour-input" type="color" />
+              </label>
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="particleDisplaySize-slider">Particle Scale</label>
+              <span id="particleDisplaySize-value"></span>
+              <input id="particleDisplaySize-slider" type="range" min="0.25" max="5.0" step="0.25" />
+            </li>
+          </ul>
         </div>
+        <div class="ui-folder">
+          <div class="ui-folder-name">Interaction</div>
+          <ul class="ui-folder-list">
+            <li class="ui-item">
+              <label class="pointer-events-none" for="pointerInteractionRadius-slider">Radius</label>
+              <span id="pointerInteractionRadius-value"></span>
+              <input id="pointerInteractionRadius-slider" type="range" min="10" max="500" step="10" />
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="pointerInteractionStrength-slider">Strength</label>
+              <span id="pointerInteractionStrength-value"></span>
+              <input id="pointerInteractionStrength-slider" type="range" min="100" max="5000" step="100" />
+            </li>
+          </ul>
+        </div>
+        <div class="ui-folder">
+          <div class="ui-folder-name">Simulation</div>
+          <ul class="ui-folder-list">
+            <li class="ui-item">
+              <label class="pointer-events-none" for="gravity-slider">Gravity</label>
+              <span id="gravity-value"></span>
+              <input id="gravity-slider" type="range" min="0" max="5000" step="100" />
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="dt-slider">Time Step</label>
+              <span id="dt-value"></span>
+              <input id="dt-slider" type="range" min="0.0002" max="0.02" step="0.0001" />
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="flipRatio-slider">Splashiness</label>
+              <span id="flipRatio-value"></span>
+              <input id="flipRatio-slider" type="range" min="0" max="1" step="0.05" />
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="projectionIterations-slider">Projection Iterations</label>
+              <span id="projectionIterations-value"></span>
+              <input id="projectionIterations-slider" type="range" min="0" max="100" step="10" />
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="particleSeparationIterations-slider">Separation Iterations</label>
+              <span id="particleSeparationIterations-value"></span>
+              <input id="particleSeparationIterations-slider" type="range" min="0" max="5" step="1" />
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="overRelaxation-slider">Over Relaxation</label>
+              <span id="overRelaxation-value"></span>
+              <input id="overRelaxation-slider" type="range" min="1.0" max="1.95" step="0.05" />
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="stiffness-slider">Stiffness</label>
+              <span id="stiffness-value"></span>
+              <input id="stiffness-slider" type="range" min="0" max="500" step="10" />
+            </li>
+          </ul>
+        </div>
+        <div class="ui-folder">
+          <div class="ui-folder-name">Domain</div>
+          <ul class="ui-folder-list">
+            <li class="ui-item">
+              <label class="pointer-events-none" for="relativeFluidWidth-slider">Fluid Width</label>
+              <span id="relativeFluidWidth-value"></span>
+              <input id="relativeFluidWidth-slider" type="range" min="0.25" max="1.0" step="0.05" />
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="relativeFluidHeight-slider">Fluid Height</label>
+              <span id="relativeFluidHeight-value"></span>
+              <input id="relativeFluidHeight-slider" type="range" min="0.25" max="1.0" step="0.05" />
+            </li>
+            <li class="ui-item">
+              <label class="pointer-events-none" for="resolution-slider">Resolution</label>
+              <span id="resolution-value"></span>
+              <input id="resolution-slider" type="range" min="20" max="120" step="10" />
+            </li>
+          </ul>
+        </div>
+      </div>
+    </aside>
 
-        <input id="ui-open-close" type="checkbox" hidden>
-
-        <aside id="ui">
-            <label for="ui-open-close" id="ui-open-close-label">OPEN</label>
-
-            <div id="inner-ui">
-                <div class="ui-folder">
-                    <div class="ui-folder-name">Rendering</div>
-                    <ul class="ui-folder-list">
-                        <li class="ui-item">
-                            <label for="colourLowDensityParticles-checkbox">Colour by Density</label>
-                            <input id="colourLowDensityParticles-checkbox" type="checkbox" hidden>
-                        </li>
-                        <li class="ui-item">
-                            <label for="colourParticlesBySpeed-checkbox">Colour by Speed</label>
-                            <input id="colourParticlesBySpeed-checkbox" type="checkbox" hidden>
-                        </li>
-                        <li class="ui-item">
-                            <label class="value-colour-box-label pointer-events-none" for="lowDensityColour-input">Low Density Colour</label>
-                            <label class="value-colour-box" for="lowDensityColour-input" aria-hidden="true">
-                                <span id="lowDensityColour-value"></span>
-                                <input id="lowDensityColour-input" type="color">
-                            </label>
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="speedColourMap-select">Speed Colour Map</label>
-                            <select id="speedColourMap-select">
-                                <optgroup label="ARTISTIC">
-                                    <option value="fire">fire</option>
-                                    <option value="ice">ice</option>
-                                    <option value="greyscale">greyscale</option>
-                                    <option value="terrain">terrain</option>
-                                    <option value="ocean">ocean</option>
-                                    <option value="flamingo">flamingo</option>
-                                    <option value="frog">frog</option>
-                                </optgroup>
-                                <optgroup label="SCIENTIFIC">
-                                    <option value="jet">jet</option>
-                                    <option value="plasma">plasma</option>
-                                    <option value="magma">magma</option>
-                                    <option value="coolwarm">coolwarm</option>
-                                    <option value="viridis">viridis</option>
-                                </optgroup>
-                            </select>
-                        </li>
-                        <li class="ui-item">
-                            <label class="value-colour-box-label pointer-events-none" for="baseColour-input">Base Colour</label>
-                            <label class="value-colour-box" for="baseColour-input" aria-hidden="true">
-                                <span id="baseColour-value"></span>
-                                <input id="baseColour-input" type="color">
-                            </label>
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="particleDisplaySize-slider">Particle Scale</label> 
-                            <span id="particleDisplaySize-value"></span>
-                            <input id="particleDisplaySize-slider" type="range" min="0.25" max="5.0" step="0.25">
-                        </li>
-                    </ul>
-                </div>
-                <div class="ui-folder">
-                    <div class="ui-folder-name">Interaction</div>
-                    <ul class="ui-folder-list">
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="pointerInteractionRadius-slider">Radius</label> 
-                            <span id="pointerInteractionRadius-value"></span>
-                            <input id="pointerInteractionRadius-slider" type="range" min="10" max="500" step="10">
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="pointerInteractionStrength-slider">Strength</label> 
-                            <span id="pointerInteractionStrength-value"></span>
-                            <input id="pointerInteractionStrength-slider" type="range" min="100" max="5000" step="100">
-                        </li>
-                    </ul>
-                </div>
-                <div class="ui-folder">
-                    <div class="ui-folder-name">Simulation</div>
-                    <ul class="ui-folder-list">
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="gravity-slider">Gravity</label> 
-                            <span id="gravity-value"></span>
-                            <input id="gravity-slider" type="range" min="0" max="5000" step="100">
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="dt-slider">Time Step</label> 
-                            <span id="dt-value"></span>
-                            <input id="dt-slider" type="range" min="0.0002" max="0.02" step="0.0001">
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="flipRatio-slider">Splashiness</label> 
-                            <span id="flipRatio-value"></span>
-                            <input id="flipRatio-slider" type="range" min="0" max="1" step="0.05">
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="projectionIterations-slider">Projection Iterations</label> 
-                            <span id="projectionIterations-value"></span>
-                            <input id="projectionIterations-slider" type="range" min="0" max="100" step="10">
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="particleSeparationIterations-slider">Separation Iterations</label> 
-                            <span id="particleSeparationIterations-value"></span>
-                            <input id="particleSeparationIterations-slider" type="range" min="0" max="5" step="1">
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="overRelaxation-slider">Over Relaxation</label> 
-                            <span id="overRelaxation-value"></span>
-                            <input id="overRelaxation-slider" type="range" min="1.0" max="1.95" step="0.05">
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="stiffness-slider">Stiffness</label> 
-                            <span id="stiffness-value"></span>
-                            <input id="stiffness-slider" type="range" min="0" max="500" step="10">
-                        </li>
-                    </ul>
-                </div>
-                <div class="ui-folder">
-                    <div class="ui-folder-name">Domain</div>
-                    <ul class="ui-folder-list">
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="relativeFluidWidth-slider">Fluid Width</label> 
-                            <span id="relativeFluidWidth-value"></span>
-                            <input id="relativeFluidWidth-slider" type="range" min="0.25" max="1.0" step="0.05">
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="relativeFluidHeight-slider">Fluid Height</label> 
-                            <span id="relativeFluidHeight-value"></span>
-                            <input id="relativeFluidHeight-slider" type="range" min="0.25" max="1.0" step="0.05">
-                        </li>
-                        <li class="ui-item">
-                            <label class="pointer-events-none" for="resolution-slider">Resolution</label> 
-                            <span id="resolution-value"></span>
-                            <input id="resolution-slider" type="range" min="20" max="120" step="10">
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </aside>
-
-        <canvas id="fluid-canvas"></canvas>
-    </body>
+    <canvas id="fluid-canvas"></canvas>
+  </body>
 </html>

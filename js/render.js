@@ -4,8 +4,6 @@ let uPointSizeLocation;
 let particlePositionsBuffer;
 let particleColoursBuffer;
 
-
-
 let vertexShaderSource = `#version 300 es
 precision mediump float;
 
@@ -42,65 +40,66 @@ void main() {
     }
 }`;
 
-
-
 function createShaderProgram(gl, vsSource, fsSource) {
-    let program = gl.createProgram();
+  let program = gl.createProgram();
 
-    let vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, vsSource);
-    gl.compileShader(vertexShader);
-    gl.attachShader(program, vertexShader);
+  let vertexShader = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vertexShader, vsSource);
+  gl.compileShader(vertexShader);
+  gl.attachShader(program, vertexShader);
 
-    let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, fsSource);
-    gl.compileShader(fragmentShader);
-    gl.attachShader(program, fragmentShader);
+  let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fragmentShader, fsSource);
+  gl.compileShader(fragmentShader);
+  gl.attachShader(program, fragmentShader);
 
-    gl.linkProgram(program);
+  gl.linkProgram(program);
 
-    return program;
+  return program;
 }
 
 export function initialise(gl, simulation, pointScale) {
-    program = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
-    gl.useProgram(program);
+  program = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
+  gl.useProgram(program);
 
-    // Get and set uniform locations.
-    uPointSizeLocation = gl.getUniformLocation(program, 'uPointSize');
-    let uSimulationDomainSizeLocation = gl.getUniformLocation(program, 'uSimulationDomainSize');
+  // Get and set uniform locations.
+  uPointSizeLocation = gl.getUniformLocation(program, "uPointSize");
+  let uSimulationDomainSizeLocation = gl.getUniformLocation(program, "uSimulationDomainSize");
 
-    gl.uniform1f(uPointSizeLocation, 2.0 * simulation.particleRadius * pointScale);
-    gl.uniform2f(uSimulationDomainSizeLocation, simulation.width, simulation.height);
+  gl.uniform1f(uPointSizeLocation, 2.0 * simulation.particleRadius * pointScale);
+  gl.uniform2f(uSimulationDomainSizeLocation, simulation.width, simulation.height);
 
-    // Attribute setup.
-    gl.enableVertexAttribArray(0);
-    gl.enableVertexAttribArray(1);
+  // Attribute setup.
+  gl.enableVertexAttribArray(0);
+  gl.enableVertexAttribArray(1);
 
-    particlePositionsBuffer = gl.createBuffer();
-    particleColoursBuffer = gl.createBuffer();
+  particlePositionsBuffer = gl.createBuffer();
+  particleColoursBuffer = gl.createBuffer();
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 2 * 4, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 2 * 4, 0);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, particleColoursBuffer);
-    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 3 * 4, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, particleColoursBuffer);
+  gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 3 * 4, 0);
 }
 
 export function draw(gl, simulation, pointScale) {
-    // Update current displayed point size.
-    gl.uniform1f(uPointSizeLocation, 2.0 * simulation.particleRadius * pointScale);
+  // Ensure viewport matches canvas.
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-    // Update positions buffer.
-    gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, simulation.particlePositions, gl.DYNAMIC_DRAW);
-    
-    // Update colours buffer.
-    gl.bindBuffer(gl.ARRAY_BUFFER, particleColoursBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, simulation.particleColours, gl.DYNAMIC_DRAW);
+  // Update current displayed point size.
+  gl.uniform1f(uPointSizeLocation, 2.0 * simulation.particleRadius * pointScale);
 
-    // Clear and draw.
-    gl.clearColor(0.09412, 0.09412, 0.09412, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.drawArrays(gl.POINTS, 0, simulation.particleCount);
+  // Update positions buffer.
+  gl.bindBuffer(gl.ARRAY_BUFFER, particlePositionsBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, simulation.particlePositions, gl.DYNAMIC_DRAW);
+
+  // Update colours buffer.
+  gl.bindBuffer(gl.ARRAY_BUFFER, particleColoursBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, simulation.particleColours, gl.DYNAMIC_DRAW);
+
+  // Clear and draw.
+  gl.clearColor(0.09412, 0.09412, 0.09412, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.drawArrays(gl.POINTS, 0, simulation.particleCount);
 }
