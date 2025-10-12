@@ -76,7 +76,7 @@ body {
   top: 0;
   right: 0;
   width: 600px;
-  height: 100vh;
+  height: 100dvh;
   padding: 60px 80px;
   box-sizing: border-box;
   display: flex;
